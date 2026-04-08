@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment variables — never commit these
+.env
+.env.local
+.env.production
+
+# Build output
+client/dist/
+client/.vite/
+
+# Uploads (local check-in photos)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Prisma generated client (regenerated at build time)
+server/node_modules/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

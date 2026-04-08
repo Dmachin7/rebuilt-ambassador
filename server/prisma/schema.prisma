@@ -1,0 +1,166 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EVENT_COORDINATOR
+  AMBASSADOR
+}
+
+enum EventStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ShiftStatus {
+  OPEN
+  ASSIGNED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  role           Role     @default(AMBASSADOR)
+  firstName      String
+  lastName       String
+  phone          String?
+  isAvailable    Boolean  @default(true)
+  lifetimeSalesCount Int  @default(0)
+
+  // 1099 fields — encrypt ssnPlaceholder before storing in production
+  legalName      String?
+  address        String?
+  ssnPlaceholder String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts           Shift[]
+  sentMessages     Message[]
+  payments         Payment[]
+  leaderboardEntry LeaderboardEntry[]
+}
+
+model Event {
+  id                String      @id @default(cuid())
+  title             String
+  location          String
+  milesFromHq       Float?
+  driveTimeMins     Int?
+  contactName       String?
+  contactPhone      String?
+  contactEmail      String?
+  date              DateTime
+  setupTimeMins     Int         @default(30)
+  breakdownTimeMins Int         @default(30)
+  payRate           Float       @default(20.0)
+  ambassadorsNeeded Int         @default(1)
+  samplesNeeded     Int?
+  notes             String?
+  status            EventStatus @default(UPCOMING)
+  totalMealsSold    Int?
+  totalSalesInput   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts   Shift[]
+  messages Message[]
+}
+
+model Shift {
+  id              String      @id @default(cuid())
+  eventId         String
+  ambassadorId    String?
+  status          ShiftStatus @default(OPEN)
+  checkinTime     DateTime?
+  checkoutTime    DateTime?
+  checkinPhotoUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ambassador User?    @relation(fields: [ambassadorId], references: [id])
+  report     Report?
+  payment    Payment?
+}
+
+model Report {
+  id           String   @id @default(cuid())
+  shiftId      String   @unique
+  feedback     String
+  issues       String?
+  mealsSold    Int      @default(0)
+  totalSales   Int      @default(0)
+  mealsPerSale Float?
+  submittedAt  DateTime @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  shiftId      String        @unique
+  ambassadorId String
+  hoursWorked  Float
+  amount       Float
+  status       PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shift      Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  ambassador User  @relation(fields: [ambassadorId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  eventId   String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  event  Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id])
+}
+
+model LeaderboardEntry {
+  id                String   @id @default(cuid())
+  userId            String
+  month             Int
+  year              Int
+  promosWorked      Int      @default(0)
+  noZeroSalePromos  Int      @default(0)
+  strongPerformance Int      @default(0)
+  weeklyBenchmarks  Int      @default(0)
+  retentionPenalty  Int      @default(0)
+  avgMealsPerSale   Float    @default(0)
+  totalPoints       Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month, year])
+}

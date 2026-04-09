@@ -90,14 +90,7 @@ export default function Login() {
           </form>
         </div>
 
-        {/* Demo credentials */}
-        <div className="mt-4 bg-mint-50 border border-mint-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-mint-700 mb-2">Demo Credentials</p>
-          <div className="space-y-1">
-            <p className="text-xs text-slate-600"><span className="font-medium">Admin:</span> admin@rebuilt.com / admin123</p>
-            <p className="text-xs text-slate-600"><span className="font-medium">Ambassador:</span> jessica@example.com / password123</p>
-          </div>
-        </div>
+        <p className="text-center text-xs text-slate-400 mt-4">Contact your administrator for login credentials.</p>
       </div>
     </div>
   );

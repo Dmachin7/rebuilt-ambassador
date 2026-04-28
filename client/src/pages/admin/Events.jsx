@@ -1,9 +1,67 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Modal, Input, Textarea, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatDate, formatShortDate } from '../../utils/formatters.js';
 import { Plus, MapPin, Phone, Mail, Clock, Users, Trash2, Edit2 } from 'lucide-react';
+import { autocompleteLocation } from '../../stubs/maps.js';
+
+function LocationInput({ value, onChange }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const containerRef = useRef(null);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    clearTimeout(debounceRef.current);
+    if (val.length < 3) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      const results = await autocompleteLocation(val);
+      setSuggestions(results);
+      setOpen(results.length > 0);
+    }, 400);
+  };
+
+  const handleSelect = (description) => {
+    onChange(description);
+    setSuggestions([]);
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClick = (e) => { if (!containerRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-xs font-medium text-slate-600 mb-1">Location *</label>
+      <input
+        value={value}
+        onChange={handleChange}
+        placeholder="Start typing an address..."
+        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-400 focus:border-transparent"
+      />
+      {open && (
+        <ul className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {suggestions.map((s) => (
+            <li
+              key={s.placeId}
+              onMouseDown={() => handleSelect(s.description)}
+              className="px-3 py-2 text-xs text-slate-700 hover:bg-mint-50 cursor-pointer flex items-start gap-2"
+            >
+              <MapPin size={12} className="mt-0.5 shrink-0 text-slate-400" />
+              {s.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const EMPTY_FORM = {
   title: '', location: '', contactName: '', contactPhone: '', contactEmail: '',
@@ -144,7 +202,7 @@ export default function AdminEvents() {
         <div className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg border border-red-200">{error}</div>}
           <Input label="Event Title *" value={form.title} onChange={f('title')} placeholder="e.g. Whole Foods Demo – South Austin" />
-          <Input label="Location *" value={form.location} onChange={f('location')} placeholder="Full address" />
+          <LocationInput value={form.location} onChange={(val) => setForm({ ...form, location: val })} />
 
           <div className="grid grid-cols-2 gap-3">
             <Input label="Date & Time *" type="datetime-local" value={form.date} onChange={f('date')} />

@@ -1,21 +1,32 @@
-/**
- * ─── STUB: GPS / Geolocation ───────────────────────────────────────────────────
- *
- * getCurrentLocation
- *   Replace with: navigator.geolocation.getCurrentPosition()
- *   Then send { lat, lng } to /api/shifts/:id/checkin
- *   Server will verify distance <= 300 feet (91 meters) from event location
- *   using Google Maps Geocoding API to convert event address to coords
- */
-
-export const getCurrentLocation = async () => {
-  // STUB — always returns mock coordinates "in range"
-  // TODO: Replace with navigator.geolocation.getCurrentPosition()
-  console.log('[STUB gps.js] getCurrentLocation — mock always returns "in range"');
-  return {
-    lat: 30.2672,
-    lng: -97.7431,
-    mock: true,
-    inRange: true,
-  };
+export const getCurrentLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => {
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            reject(new Error('Location permission denied. Please allow location access to check in.'));
+            break;
+          case error.POSITION_UNAVAILABLE:
+            reject(new Error('Location unavailable. Please try again.'));
+            break;
+          case error.TIMEOUT:
+            reject(new Error('Location request timed out. Please try again.'));
+            break;
+          default:
+            reject(new Error('Unable to get your location.'));
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
 };

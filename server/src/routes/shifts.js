@@ -9,6 +9,31 @@ const { uploadPhoto } = require('../stubs/storage');
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
+const CHECKIN_RADIUS_METERS = 91.44; // 300 feet
+
+async function geocodeAddress(address) {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'ReBuilt-Ambassador-Platform/1.0' },
+  });
+  const data = await res.json();
+  if (!data.length) throw new Error('Could not geocode event address');
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLng = (lng2 - lng1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // GET /api/shifts/open
 router.get('/open', verifyToken, async (req, res) => {
   try {
@@ -157,14 +182,32 @@ router.post('/:id/unassign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATO
 // POST /api/shifts/:id/checkin
 router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res) => {
   try {
-    const shift = await prisma.shift.findUnique({ where: { id: req.params.id } });
+    const shift = await prisma.shift.findUnique({
+      where: { id: req.params.id },
+      include: { event: true },
+    });
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     if (shift.ambassadorId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Not your shift' });
     }
     if (shift.checkinTime) return res.status(400).json({ error: 'Already checked in' });
 
-    console.log('[STUB GPS] Location check — mock always returns "in range" (300ft geofence not yet active)');
+    const ambassadorLat = parseFloat(req.body.lat);
+    const ambassadorLng = parseFloat(req.body.lng);
+
+    if (isNaN(ambassadorLat) || isNaN(ambassadorLng)) {
+      return res.status(400).json({ error: 'Location is required to check in' });
+    }
+
+    const eventCoords = await geocodeAddress(shift.event.location);
+    const distance = haversineDistance(ambassadorLat, ambassadorLng, eventCoords.lat, eventCoords.lng);
+
+    if (distance > CHECKIN_RADIUS_METERS) {
+      const feet = Math.round(distance * 3.28084);
+      return res.status(400).json({
+        error: `You are ${feet}ft from the event location. You must be within 300ft to check in.`,
+      });
+    }
 
     const photoResult = req.file ? await uploadPhoto(req.file) : { url: null };
 

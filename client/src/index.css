@@ -3,8 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-slate-50 text-slate-800 antialiased;
+    overflow-x: hidden;
+    max-width: 100%;
   }
 
   * {

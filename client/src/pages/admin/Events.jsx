@@ -1,15 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsAPI } from '../../api/index.js';
-import { Card, Button, Badge, Modal, Input, Textarea, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
-import { formatDate, formatShortDate } from '../../utils/formatters.js';
-import { Plus, MapPin, Phone, Mail, Clock, Users, Trash2, Edit2 } from 'lucide-react';
+import { Card, Button, Badge, Modal, Input, Textarea, Spinner, EmptyState } from '../../components/ui/index.jsx';
+import { formatShortDate } from '../../utils/formatters.js';
+import { Plus, MapPin, Clock, Users, Trash2, Edit2 } from 'lucide-react';
 import { autocompleteLocation } from '../../stubs/maps.js';
 
 const EMPTY_FORM = {
   title: '', location: '', contactName: '', contactPhone: '', contactEmail: '',
-  date: '', endTime: '', setupTimeMins: 30, ambassadorsNeeded: 1,
+  startDate: '', startTime: '', endDate: '', endTime: '',
+  setupTimeMins: 30, ambassadorsNeeded: 1,
   samplesNeeded: '', snackBitesNeeded: '', notes: '',
+};
+
+// Extract local YYYY-MM-DD from a date value
+const toLocalDate = (dt) => {
+  const d = new Date(dt);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+};
+
+// Extract local HH:MM from a date value
+const toLocalTime = (dt) => {
+  const d = new Date(dt);
+  return [String(d.getHours()).padStart(2, '0'), String(d.getMinutes()).padStart(2, '0')].join(':');
+};
+
+// Combine date + time strings into an ISO string the backend can parse
+const combineDatetime = (date, time) => {
+  if (!date) return null;
+  return new Date(`${date}T${time || '00:00'}`).toISOString();
 };
 
 function LocationAutocomplete({ value, onChange }) {
@@ -69,6 +88,33 @@ function LocationAutocomplete({ value, onChange }) {
   );
 }
 
+function DateTimeRow({ dateLabel, timeLabel, dateValue, timeValue, onDateChange, onTimeChange, required }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          {dateLabel}{required && ' *'}
+        </label>
+        <input
+          type="date"
+          value={dateValue}
+          onChange={(e) => onDateChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-400 focus:border-transparent"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{timeLabel}</label>
+        <input
+          type="time"
+          value={timeValue}
+          onChange={(e) => onTimeChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-mint-400 focus:border-transparent"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,15 +130,20 @@ export default function AdminEvents() {
   useEffect(() => { setLoading(true); load(); }, [filter]);
 
   const openCreate = () => { setEditingEvent(null); setForm(EMPTY_FORM); setError(''); setModalOpen(true); };
+
   const openEdit = (e, event) => {
     e.preventDefault();
     setEditingEvent(event);
     setForm({
-      title: event.title, location: event.location,
-      contactName: event.contactName || '', contactPhone: event.contactPhone || '',
+      title: event.title,
+      location: event.location,
+      contactName: event.contactName || '',
+      contactPhone: event.contactPhone || '',
       contactEmail: event.contactEmail || '',
-      date: new Date(event.date).toISOString().slice(0, 16),
-      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : '',
+      startDate: toLocalDate(event.date),
+      startTime: toLocalTime(event.date),
+      endDate: event.endTime ? toLocalDate(event.endTime) : '',
+      endTime: event.endTime ? toLocalTime(event.endTime) : '',
       setupTimeMins: event.setupTimeMins,
       ambassadorsNeeded: event.ambassadorsNeeded,
       samplesNeeded: event.samplesNeeded || '',
@@ -104,13 +155,21 @@ export default function AdminEvents() {
   };
 
   const handleSave = async () => {
-    if (!form.title || !form.location || !form.date) { setError('Title, location, and date are required'); return; }
+    if (!form.title || !form.location || !form.startDate) {
+      setError('Title, location, and start date are required');
+      return;
+    }
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        date: combineDatetime(form.startDate, form.startTime),
+        endTime: form.endDate ? combineDatetime(form.endDate, form.endTime) : null,
+      };
       if (editingEvent) {
-        await eventsAPI.update(editingEvent.id, form);
+        await eventsAPI.update(editingEvent.id, payload);
       } else {
-        await eventsAPI.create(form);
+        await eventsAPI.create(payload);
       }
       setModalOpen(false);
       load();
@@ -129,6 +188,7 @@ export default function AdminEvents() {
   };
 
   const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const set = (field) => (val) => setForm((prev) => ({ ...prev, [field]: val }));
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
@@ -204,21 +264,41 @@ export default function AdminEvents() {
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingEvent ? 'Edit Event' : 'New Event'} size="lg">
         <div className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg border border-red-200">{error}</div>}
+
           <Input label="Event Title *" value={form.title} onChange={f('title')} placeholder="e.g. Whole Foods Demo – South Austin" />
 
           <LocationAutocomplete
             value={form.location}
-            onChange={(val) => setForm({ ...form, location: val })}
+            onChange={set('location')}
           />
 
-          <div className="grid grid-cols-3 gap-3">
-            <Input label="Start Time *" type="datetime-local" value={form.date} onChange={f('date')} />
-            <Input label="End Time" type="datetime-local" value={form.endTime} onChange={f('endTime')} />
-            <Input label="Ambassadors Needed" type="number" min="1" value={form.ambassadorsNeeded} onChange={f('ambassadorsNeeded')} />
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Start</p>
+            <DateTimeRow
+              dateLabel="Date" timeLabel="Time"
+              dateValue={form.startDate} timeValue={form.startTime}
+              onDateChange={set('startDate')} onTimeChange={set('startTime')}
+              required
+            />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              End <span className="text-slate-400 normal-case font-normal">(optional)</span>
+            </p>
+            <DateTimeRow
+              dateLabel="Date" timeLabel="Time"
+              dateValue={form.endDate} timeValue={form.endTime}
+              onDateChange={set('endDate')} onTimeChange={set('endTime')}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Ambassadors Needed" type="number" min="1" value={form.ambassadorsNeeded} onChange={f('ambassadorsNeeded')} />
             <Input label="Setup (mins)" type="number" min="0" value={form.setupTimeMins} onChange={f('setupTimeMins')} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <Input label="Sample Meals" type="number" min="0" value={form.samplesNeeded} onChange={f('samplesNeeded')} placeholder="Optional" />
             <Input label="Snack Bites" type="number" min="0" value={form.snackBitesNeeded} onChange={f('snackBitesNeeded')} placeholder="Optional" />
           </div>

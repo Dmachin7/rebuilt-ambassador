@@ -1,15 +1,73 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Modal, Input, Textarea, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatDate, formatShortDate } from '../../utils/formatters.js';
 import { Plus, MapPin, Phone, Mail, Clock, Users, Trash2, Edit2 } from 'lucide-react';
+import { autocompleteLocation } from '../../stubs/maps.js';
 
 const EMPTY_FORM = {
   title: '', location: '', contactName: '', contactPhone: '', contactEmail: '',
-  date: '', setupTimeMins: 30, breakdownTimeMins: 30, ambassadorsNeeded: 1,
-  samplesNeeded: '', notes: '',
+  date: '', endTime: '', setupTimeMins: 30, ambassadorsNeeded: 1,
+  samplesNeeded: '', snackBitesNeeded: '', notes: '',
 };
+
+function LocationAutocomplete({ value, onChange }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  const handleInput = (e) => {
+    const q = e.target.value;
+    onChange(q);
+    clearTimeout(debounceRef.current);
+    if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      const results = await autocompleteLocation(q);
+      setSuggestions(results);
+      setOpen(results.length > 0);
+    }, 300);
+  };
+
+  const select = (desc) => {
+    onChange(desc);
+    setSuggestions([]);
+    setOpen(false);
+  };
+
+  useEffect(() => {
+    const handler = (e) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <Input
+        label="Location *"
+        value={value}
+        onChange={handleInput}
+        placeholder="Start typing an address..."
+        autoComplete="off"
+      />
+      {open && (
+        <ul className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+          {suggestions.map((s) => (
+            <li
+              key={s.placeId}
+              onMouseDown={() => select(s.description)}
+              className="px-3 py-2.5 text-sm text-slate-700 hover:bg-mint-50 cursor-pointer flex items-center gap-2"
+            >
+              <MapPin size={13} className="text-slate-400 shrink-0" />
+              {s.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function AdminEvents() {
   const [events, setEvents] = useState([]);
@@ -34,8 +92,11 @@ export default function AdminEvents() {
       contactName: event.contactName || '', contactPhone: event.contactPhone || '',
       contactEmail: event.contactEmail || '',
       date: new Date(event.date).toISOString().slice(0, 16),
-      setupTimeMins: event.setupTimeMins, breakdownTimeMins: event.breakdownTimeMins,
-      ambassadorsNeeded: event.ambassadorsNeeded, samplesNeeded: event.samplesNeeded || '',
+      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : '',
+      setupTimeMins: event.setupTimeMins,
+      ambassadorsNeeded: event.ambassadorsNeeded,
+      samplesNeeded: event.samplesNeeded || '',
+      snackBitesNeeded: event.snackBitesNeeded || '',
       notes: event.notes || '',
     });
     setError('');
@@ -144,17 +205,22 @@ export default function AdminEvents() {
         <div className="space-y-4">
           {error && <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg border border-red-200">{error}</div>}
           <Input label="Event Title *" value={form.title} onChange={f('title')} placeholder="e.g. Whole Foods Demo – South Austin" />
-          <Input label="Location *" value={form.location} onChange={f('location')} placeholder="Full address" />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Date & Time *" type="datetime-local" value={form.date} onChange={f('date')} />
+          <LocationAutocomplete
+            value={form.location}
+            onChange={(val) => setForm({ ...form, location: val })}
+          />
+
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="Start Time *" type="datetime-local" value={form.date} onChange={f('date')} />
+            <Input label="End Time" type="datetime-local" value={form.endTime} onChange={f('endTime')} />
             <Input label="Ambassadors Needed" type="number" min="1" value={form.ambassadorsNeeded} onChange={f('ambassadorsNeeded')} />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <Input label="Setup (mins)" type="number" min="0" value={form.setupTimeMins} onChange={f('setupTimeMins')} />
-            <Input label="Breakdown (mins)" type="number" min="0" value={form.breakdownTimeMins} onChange={f('breakdownTimeMins')} />
-            <Input label="Samples Needed" type="number" min="0" value={form.samplesNeeded} onChange={f('samplesNeeded')} placeholder="Optional" />
+            <Input label="Sample Meals" type="number" min="0" value={form.samplesNeeded} onChange={f('samplesNeeded')} placeholder="Optional" />
+            <Input label="Snack Bites" type="number" min="0" value={form.snackBitesNeeded} onChange={f('snackBitesNeeded')} placeholder="Optional" />
           </div>
 
           <div className="bg-mint-50 rounded-lg px-3 py-2 text-xs text-slate-600">

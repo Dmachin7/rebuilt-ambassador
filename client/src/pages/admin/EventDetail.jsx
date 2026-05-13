@@ -86,23 +86,25 @@ export default function EventDetail() {
               <div className="flex items-center gap-2">
                 <Clock size={15} className="text-slate-400 shrink-0" />
                 <span className="text-slate-700">{formatDateTime(event.date)}</span>
+                {event.endTime && (
+                  <span className="text-slate-400 text-xs">→ {formatDateTime(event.endTime)}</span>
+                )}
               </div>
-              <div className="grid grid-cols-3 gap-3 mt-2">
+              <div className="grid grid-cols-2 gap-3 mt-2">
                 <div className="bg-slate-50 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-slate-800">{event.setupTimeMins}</div>
                   <div className="text-xs text-slate-500">Setup mins</div>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-3 text-center">
-                  <div className="text-lg font-bold text-slate-800">{event.breakdownTimeMins}</div>
-                  <div className="text-xs text-slate-500">Breakdown mins</div>
                 </div>
                 <div className="bg-mint-50 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-mint-700">$20/hr</div>
                   <div className="text-xs text-slate-500">Pay rate</div>
                 </div>
               </div>
-              {event.samplesNeeded && (
-                <div className="text-slate-600 text-xs">📦 {event.samplesNeeded} samples needed</div>
+              {(event.samplesNeeded || event.snackBitesNeeded) && (
+                <div className="flex gap-4 text-slate-600 text-xs">
+                  {event.samplesNeeded && <span>📦 {event.samplesNeeded} sample meals</span>}
+                  {event.snackBitesNeeded && <span>🍬 {event.snackBitesNeeded} snack bites</span>}
+                </div>
               )}
               {event.notes && (
                 <div className="bg-slate-50 rounded-lg p-3">

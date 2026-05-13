@@ -57,12 +57,13 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/events — admin only
-router.post('/', verifyToken, requireRole('ADMIN'), async (req, res) => {
+// POST /api/events — admin or event coordinator
+router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
     const {
       title, location, contactName, contactPhone, contactEmail,
-      date, setupTimeMins, breakdownTimeMins, ambassadorsNeeded, samplesNeeded, notes,
+      date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
+      samplesNeeded, snackBitesNeeded, notes,
     } = req.body;
 
     if (!title || !location || !date) {
@@ -81,10 +82,12 @@ router.post('/', verifyToken, requireRole('ADMIN'), async (req, res) => {
         contactPhone,
         contactEmail,
         date: new Date(date),
+        endTime: endTime ? new Date(endTime) : null,
         setupTimeMins: parseInt(setupTimeMins) || 30,
         breakdownTimeMins: parseInt(breakdownTimeMins) || 30,
         ambassadorsNeeded: parseInt(ambassadorsNeeded) || 1,
         samplesNeeded: samplesNeeded ? parseInt(samplesNeeded) : null,
+        snackBitesNeeded: snackBitesNeeded ? parseInt(snackBitesNeeded) : null,
         notes,
         status: 'UPCOMING',
       },
@@ -108,12 +111,13 @@ router.post('/', verifyToken, requireRole('ADMIN'), async (req, res) => {
   }
 });
 
-// PUT /api/events/:id — admin only
-router.put('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
+// PUT /api/events/:id — admin or event coordinator
+router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
     const {
       title, location, contactName, contactPhone, contactEmail,
-      date, setupTimeMins, breakdownTimeMins, ambassadorsNeeded, samplesNeeded, notes, status,
+      date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
+      samplesNeeded, snackBitesNeeded, notes, status,
     } = req.body;
 
     const data = {};
@@ -123,10 +127,12 @@ router.put('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
     if (contactPhone !== undefined) data.contactPhone = contactPhone;
     if (contactEmail !== undefined) data.contactEmail = contactEmail;
     if (date !== undefined) data.date = new Date(date);
+    if (endTime !== undefined) data.endTime = endTime ? new Date(endTime) : null;
     if (setupTimeMins !== undefined) data.setupTimeMins = parseInt(setupTimeMins);
     if (breakdownTimeMins !== undefined) data.breakdownTimeMins = parseInt(breakdownTimeMins);
     if (ambassadorsNeeded !== undefined) data.ambassadorsNeeded = parseInt(ambassadorsNeeded);
     if (samplesNeeded !== undefined) data.samplesNeeded = samplesNeeded ? parseInt(samplesNeeded) : null;
+    if (snackBitesNeeded !== undefined) data.snackBitesNeeded = snackBitesNeeded ? parseInt(snackBitesNeeded) : null;
     if (notes !== undefined) data.notes = notes;
     if (status !== undefined) data.status = status;
 

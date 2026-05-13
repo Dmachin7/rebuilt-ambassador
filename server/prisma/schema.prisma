@@ -70,11 +70,13 @@ model Event {
   contactPhone      String?
   contactEmail      String?
   date              DateTime
+  endTime           DateTime?
   setupTimeMins     Int         @default(30)
   breakdownTimeMins Int         @default(30)
   payRate           Float       @default(20.0)
   ambassadorsNeeded Int         @default(1)
   samplesNeeded     Int?
+  snackBitesNeeded  Int?
   notes             String?
   status            EventStatus @default(UPCOMING)
   totalMealsSold    Int?

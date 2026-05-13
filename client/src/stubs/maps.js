@@ -1,43 +1,28 @@
-function formatAddress(item) {
-  const a = item.address || {};
-  const parts = [];
-  if (a.house_number && a.road) parts.push(`${a.house_number} ${a.road}`);
-  else if (a.road) parts.push(a.road);
-  if (a.city || a.town || a.suburb) parts.push(a.city || a.town || a.suburb);
-  if (a.state) parts.push(a.state);
-  if (a.postcode) parts.push(a.postcode);
-  return parts.length
-    ? parts.join(', ')
-    : item.display_name.split(',').slice(0, 3).join(',').trim();
-}
-
 export const autocompleteLocation = async (query) => {
   if (!query || query.length < 2) return [];
 
-  // Append Tampa context for short/bare queries so Nominatim resolves
-  // partial addresses much earlier (e.g. "4618 N Hale" → "4618 N Hale, Tampa FL")
-  const hasContext = /(tampa|florida|\bfl\b|hillsborough)/i.test(query);
-  const searchQuery = hasContext ? query : `${query}, Tampa FL`;
+  const token = import.meta.env.VITE_MAPBOX_TOKEN;
+  if (!token) {
+    console.warn('VITE_MAPBOX_TOKEN is not set');
+    return [];
+  }
 
   const params = new URLSearchParams({
-    q: searchQuery,
-    format: 'json',
+    access_token: token,
+    country: 'us',
+    proximity: '-82.4572,27.9506', // Tampa, FL — biases results toward HQ area
+    types: 'address,poi',
     limit: '6',
-    countrycodes: 'us',
-    // Bias results toward Tampa metro area (not hard-bounded so other FL cities still work)
-    viewbox: '-82.85,28.17,-82.28,27.82',
-    bounded: '0',
-    addressdetails: '1',
+    language: 'en',
   });
 
   const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?${params}`,
-    { headers: { 'User-Agent': 'ReBuilt-Ambassador-Platform/1.0' } }
+    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
   );
   const data = await res.json();
 
-  return data.slice(0, 5).map((item) => ({
-    description: formatAddress(item),
-    placeId: item.place_id,
+  return (data.features || []).map((f) => ({
+    description: f.place_name.replace(', United States', ''),
+    placeId: f.id,
   }));
 };

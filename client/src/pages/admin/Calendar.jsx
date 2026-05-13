@@ -13,6 +13,7 @@ import { Save } from 'lucide-react';
 export default function AdminCalendar() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = window.innerWidth < 640;
   const [selected, setSelected] = useState(null);
   const [pendingChanges, setPendingChanges] = useState({}); // eventId → newDate
   const [saving, setSaving] = useState(false);
@@ -140,15 +141,19 @@ export default function AdminCalendar() {
           <Card className="p-2 overflow-hidden">
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={{
+              initialView={isMobile ? 'listMonth' : 'dayGridMonth'}
+              headerToolbar={isMobile ? {
+                left: 'prev,next',
+                center: 'title',
+                right: 'today',
+              } : {
                 left: 'prev,next today',
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek,listWeek',
               }}
               events={calendarEvents}
               eventClick={handleEventClick}
-              editable={true}
+              editable={!isMobile}
               eventDrop={handleEventDrop}
               height="auto"
               eventDisplay="block"

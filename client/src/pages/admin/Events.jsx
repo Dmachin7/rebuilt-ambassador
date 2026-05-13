@@ -203,13 +203,15 @@ export default function AdminEvents() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        {[['', 'All'], ['UPCOMING', 'Upcoming'], ['ACTIVE', 'Active'], ['COMPLETED', 'Completed']].map(([val, label]) => (
-          <button key={val} onClick={() => setFilter(val)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-            {label}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit min-w-max">
+          {[['', 'All'], ['UPCOMING', 'Upcoming'], ['ACTIVE', 'Active'], ['COMPLETED', 'Completed']].map(([val, label]) => (
+            <button key={val} onClick={() => setFilter(val)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {events.length === 0 ? (
@@ -309,7 +311,7 @@ export default function AdminEvents() {
 
           <div className="border-t border-slate-100 pt-4">
             <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">Event Contact</p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3">
               <Input label="Name" value={form.contactName} onChange={f('contactName')} placeholder="Contact name" />
               <Input label="Phone" value={form.contactPhone} onChange={f('contactPhone')} placeholder="512-555-0000" />
               <Input label="Email" type="email" value={form.contactEmail} onChange={f('contactEmail')} placeholder="email@store.com" />

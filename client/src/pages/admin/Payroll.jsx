@@ -227,13 +227,15 @@ function PayrollRecords() {
         </Card>
       </div>
 
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        {[['', 'All'], ['PENDING', 'Pending'], ['APPROVED', 'Approved'], ['PAID', 'Paid']].map(([val, label]) => (
-          <button key={val} onClick={() => setFilter(val)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-            {label}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit min-w-max">
+          {[['', 'All'], ['PENDING', 'Pending'], ['APPROVED', 'Approved'], ['PAID', 'Paid']].map(([val, label]) => (
+            <button key={val} onClick={() => setFilter(val)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {payments.length === 0 ? (
@@ -301,15 +303,17 @@ export default function AdminPayroll() {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        <button onClick={() => setTab('records')}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'records' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-          Payment Records
-        </button>
-        <button onClick={() => setTab('biweekly')}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'biweekly' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-          <Calendar size={12} /> Bi-Weekly Summary
-        </button>
+      <div className="overflow-x-auto">
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit min-w-max">
+          <button onClick={() => setTab('records')}
+            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'records' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+            Payment Records
+          </button>
+          <button onClick={() => setTab('biweekly')}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'biweekly' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+            <Calendar size={12} /> Bi-Weekly Summary
+          </button>
+        </div>
       </div>
 
       {tab === 'records' ? <PayrollRecords /> : <BiweeklySummary />}

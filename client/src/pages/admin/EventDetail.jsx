@@ -182,7 +182,7 @@ export default function EventDetail() {
                       <span className="text-sm font-medium text-slate-700">
                         {shift.ambassador?.firstName} {shift.ambassador?.lastName}
                       </span>
-                      <div className="flex gap-3 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                         <span>🛒 {shift.report.salesCount} sales</span>
                         <span>✋ {shift.report.signupsCount} sign-ups</span>
                         {shift.report.mealsPerSale && <span>🍽 {shift.report.mealsPerSale} meals/sale</span>}

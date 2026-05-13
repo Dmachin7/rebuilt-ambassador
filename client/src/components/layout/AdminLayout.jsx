@@ -39,9 +39,9 @@ export default function AdminLayout() {
       {/* Logo */}
       <div className="px-6 py-5 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-mint-300 rounded-lg flex items-center justify-center font-bold text-slate-800 text-sm">R</div>
+          <img src="/rebuilt-logo.png" alt="ReBuilt Meals" className="h-10 w-10 object-contain" />
           <div>
-            <div className="font-bold text-slate-800 text-sm">ReBuilt</div>
+            <div className="font-bold text-slate-800 text-sm">ReBuilt Meals</div>
             <div className="text-xs text-slate-400">{ROLE_LABELS[user?.role] || 'Portal'}</div>
           </div>
         </div>
@@ -111,14 +111,15 @@ export default function AdminLayout() {
             <button onClick={() => setMobileOpen(true)} className="text-slate-600">
               <Menu size={22} />
             </button>
-            <div className="font-semibold text-slate-800 text-sm">ReBuilt {user?.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Admin'}</div>
+            <img src="/rebuilt-logo.png" alt="ReBuilt Meals" className="h-8 w-8 object-contain" />
+            <div className="font-semibold text-slate-800 text-sm">{user?.role === 'EVENT_COORDINATOR' ? 'Coordinator' : 'Admin'}</div>
           </div>
           <div className="w-8 h-8 bg-mint-200 rounded-full flex items-center justify-center text-xs font-medium text-mint-700">
             {user?.firstName?.[0]}{user?.lastName?.[0]}
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
           <Outlet />
         </main>
       </div>

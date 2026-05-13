@@ -34,7 +34,7 @@ function EventMetricsPanel({ event, onSave }) {
   return (
     <div className="mt-3 pt-3 border-t border-slate-100">
       <p className="text-xs font-medium text-slate-500 mb-2">Admin Metrics Input</p>
-      <div className="flex gap-2 items-end">
+      <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1">
           <label className="text-xs text-slate-400">Meals Sold</label>
           <input

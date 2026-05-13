@@ -25,8 +25,8 @@ export default function AmbassadorLayout() {
       {/* Mobile top header */}
       <header className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-mint-300 rounded-lg flex items-center justify-center font-bold text-slate-800 text-xs">R</div>
-          <span className="font-semibold text-slate-800 text-sm">ReBuilt</span>
+          <img src="/rebuilt-logo.png" alt="ReBuilt Meals" className="h-8 w-8 object-contain" />
+          <span className="font-semibold text-slate-800 text-sm">ReBuilt Meals</span>
         </div>
         <div className="flex items-center gap-3">
           <NavLink to="/dashboard" className="text-xs text-slate-500 hover:text-slate-800 hidden sm:block">

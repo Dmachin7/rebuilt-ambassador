@@ -78,6 +78,21 @@
   }
 }
 
+/* FullCalendar mobile */
+@media (max-width: 639px) {
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1rem !important;
+  }
+  .fc .fc-button {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+}
+
 /* FullCalendar mint theme overrides */
 .fc-button-primary {
   background-color: #A8E6CF !important;

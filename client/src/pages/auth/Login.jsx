@@ -34,10 +34,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-14 h-14 bg-mint-300 rounded-2xl items-center justify-center mb-3 shadow-md">
-            <span className="text-2xl font-bold text-slate-800">R</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800">ReBuilt</h1>
+          <img src="/rebuilt-logo.png" alt="ReBuilt Meals" className="h-24 w-24 object-contain mx-auto mb-3" />
           <p className="text-slate-500 text-sm mt-1">Ambassador Portal</p>
         </div>
 

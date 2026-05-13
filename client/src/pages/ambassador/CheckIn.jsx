@@ -151,13 +151,13 @@ export default function CheckIn() {
             <p className="text-xs text-slate-400 mt-0.5">
               {locationStatus === 'idle' && 'Will verify when you check in'}
               {locationStatus === 'checking' && 'Verifying location...'}
-              {locationStatus === 'ok' && '✅ Location verified (mock — always passes)'}
-              {locationStatus === 'error' && '❌ Location error'}
+              {locationStatus === 'ok' && '✅ Location verified — you are within range'}
+              {locationStatus === 'error' && '❌ Location check failed'}
             </p>
           </div>
           <div className={`w-3 h-3 rounded-full ${locationStatus === 'ok' ? 'bg-green-400' : locationStatus === 'error' ? 'bg-red-400' : 'bg-slate-200'}`} />
         </div>
-        <p className="text-xs text-slate-300 mt-2">[STUB] GPS always passes. Real geofencing (300ft) will be added later.</p>
+        <p className="text-xs text-slate-400 mt-2">Must be within 300ft of the event location to check in.</p>
       </Card>
 
       {/* Photo upload — only for check-in */}

@@ -52,7 +52,7 @@ function LocationAutocomplete({ value, onChange }) {
         autoComplete="off"
       />
       {open && (
-        <ul className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+        <ul className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto">
           {suggestions.map((s) => (
             <li
               key={s.placeId}

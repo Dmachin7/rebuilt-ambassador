@@ -1,5 +1,7 @@
 # ReBuilt Ambassador & Event Management Platform
 
+<!-- platform v1.0 -->
+
 Internal platform for managing ambassador event staffing, shift scheduling, check-in/out, payroll, reporting, and the "Cook Less, Sell More" monthly leaderboard.
 
 ---

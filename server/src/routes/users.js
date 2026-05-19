@@ -93,6 +93,37 @@ router.patch('/:id/availability', verifyToken, async (req, res) => {
   }
 });
 
+// DELETE /api/users/:id — admin only
+router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id === id) return res.status(400).json({ error: 'You cannot delete your own account' });
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Open up any shifts that were assigned but not yet completed
+    await prisma.shift.updateMany({
+      where: { ambassadorId: id, status: { in: ['ASSIGNED', 'CHECKED_IN'] } },
+      data: { ambassadorId: null, status: 'OPEN' },
+    });
+    // Detach from completed shifts so historical event records remain intact
+    await prisma.shift.updateMany({
+      where: { ambassadorId: id },
+      data: { ambassadorId: null },
+    });
+    await prisma.payment.deleteMany({ where: { ambassadorId: id } });
+    await prisma.message.deleteMany({ where: { senderId: id } });
+    await prisma.leaderboardEntry.deleteMany({ where: { userId: id } });
+    await prisma.user.delete({ where: { id } });
+
+    res.json({ message: 'Ambassador removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/users — create a new Brand Ambassador (admin or event coordinator)
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {

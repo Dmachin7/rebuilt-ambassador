@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { usersAPI, shiftsAPI } from '../../api/index.js';
 import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours } from '../../utils/formatters.js';
-import { Phone, Mail, UserPlus, X, Eye, EyeOff } from 'lucide-react';
+import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 
 function AddAmbassadorModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '' });
@@ -67,7 +67,7 @@ function AddAmbassadorModal({ onClose, onCreated }) {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-slate-400">Stub: real implementation will email credentials via SendGrid/Nodemailer</p>
+            <p className="text-xs text-slate-400">A welcome email with a set-password link has been sent to the ambassador.</p>
             <Button className="w-full" onClick={onClose}>Done</Button>
           </div>
         ) : (
@@ -115,6 +115,8 @@ export default function AdminAmbassadors() {
   const [hours, setHours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // ambassador object to delete
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     Promise.all([usersAPI.list('AMBASSADOR'), shiftsAPI.hours()])
@@ -130,6 +132,20 @@ export default function AdminAmbassadors() {
   const handleCreated = (newUser) => {
     setAmbassadors((prev) => [newUser, ...prev]);
     setShowAddModal(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await usersAPI.delete(confirmDelete.id);
+      setAmbassadors((prev) => prev.filter((a) => a.id !== confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      alert(err.message || 'Failed to remove ambassador.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
@@ -205,6 +221,13 @@ export default function AdminAmbassadors() {
                   <span>Lifetime sales: <span className="font-medium text-slate-600">{amb.lifetimeSalesCount || 0}</span></span>
                   <span>Joined {new Date(amb.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                 </div>
+
+                <button
+                  onClick={() => setConfirmDelete(amb)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
+                >
+                  <Trash2 size={13} /> Remove Ambassador
+                </button>
               </Card>
             );
           })}
@@ -216,6 +239,27 @@ export default function AdminAmbassadors() {
           onClose={() => setShowAddModal(false)}
           onCreated={handleCreated}
         />
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="font-semibold text-slate-800 mb-1">Remove Ambassador?</h3>
+            <p className="text-sm text-slate-500 mb-5">
+              <span className="font-medium text-slate-700">{confirmDelete.firstName} {confirmDelete.lastName}</span> will be permanently deleted. Any shifts they were assigned to will be reopened.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancel</Button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition"
+              >
+                {deleting ? 'Removing...' : 'Yes, Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

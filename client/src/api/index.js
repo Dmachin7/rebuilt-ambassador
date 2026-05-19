@@ -78,6 +78,7 @@ export const usersAPI = {
   update: (id, data) => api.put(`/users/${id}`, data),
   create: (data) => api.post('/users', data),
   setAvailability: (id, isAvailable) => api.patch(`/users/${id}/availability`, { isAvailable }),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 // Notifications

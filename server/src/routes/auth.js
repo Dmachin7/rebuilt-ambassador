@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
@@ -54,6 +55,30 @@ router.post('/register', async (req, res) => {
       data: { email, passwordHash: bcrypt.hashSync(password, 10), firstName, lastName, phone, role },
     });
     res.status(201).json({ token: signToken(user), user: safeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/set-password — used by the welcome email link to let ambassadors set their own password
+router.post('/set-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await prisma.user.findFirst({
+      where: { resetToken: hashed, resetTokenExpiry: { gt: new Date() } },
+    });
+    if (!user) return res.status(400).json({ error: 'This link is invalid or has expired. Ask an admin to resend your welcome email.' });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: bcrypt.hashSync(password, 10), resetToken: null, resetTokenExpiry: null },
+    });
+    res.json({ message: 'Password set successfully. You can now log in.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { calculateDistanceFromHQ } = require('../stubs/maps');
+const { sendPostEventRecapEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -120,6 +121,8 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       samplesNeeded, snackBitesNeeded, notes, status,
     } = req.body;
 
+    const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true } });
+
     const data = {};
     if (title !== undefined) data.title = title;
     if (location !== undefined) data.location = location;
@@ -137,6 +140,26 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (status !== undefined) data.status = status;
 
     const event = await prisma.event.update({ where: { id: req.params.id }, data });
+
+    if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {
+      const fullEvent = await prisma.event.findUnique({
+        where: { id: event.id },
+        include: {
+          shifts: { include: { ambassador: { select: { firstName: true, lastName: true } } } },
+        },
+      });
+      const staff = await prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } },
+        select: { email: true },
+      });
+      const staffEmails = staff.map((u) => u.email);
+      if (staffEmails.length > 0) {
+        sendPostEventRecapEmail(staffEmails, fullEvent, fullEvent.shifts).catch((err) =>
+          console.error('[RECAP EMAIL]', err)
+        );
+      }
+    }
+
     res.json(event);
   } catch (err) {
     console.error(err);

@@ -1,8 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
+const { sendWelcomeEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -101,6 +103,10 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -109,12 +115,18 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         lastName,
         phone: phone || null,
         role: 'AMBASSADOR',
+        resetToken: hashedToken,
+        resetTokenExpiry: tokenExpiry,
       },
       select: {
         id: true, email: true, role: true, firstName: true, lastName: true, phone: true, createdAt: true,
       },
     });
-    // Return the plain-text password once so the caller can display / email it
+
+    const setPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/set-password?token=${rawToken}`;
+    sendWelcomeEmail(user, setPasswordUrl).catch((err) => console.error('[WELCOME EMAIL]', err));
+
+    // Return the plain-text password once so the caller can still display it in the modal
     res.status(201).json({ user, plainPassword: password });
   } catch (err) {
     console.error(err);

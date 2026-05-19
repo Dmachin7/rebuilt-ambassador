@@ -14,6 +14,8 @@ const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 
+require('./services/reminderCron');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 
 // Auth
 import Login from './pages/auth/Login.jsx';
+import SetPassword from './pages/auth/SetPassword.jsx';
 
 // Admin / Coordinator shared layout
 import AdminLayout from './components/layout/AdminLayout.jsx';
@@ -59,6 +60,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/set-password" element={<SetPassword />} />
           <Route path="/" element={<RootRedirect />} />
 
           {/* Admin + Event Coordinator routes */}

@@ -5,6 +5,7 @@ const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
+const { sendShiftAssignedEmail } = require('../services/emailService');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -122,6 +123,9 @@ router.post('/:id/claim', verifyToken, requireRole('AMBASSADOR'), async (req, re
         hoursUntil
       );
     }
+    if (ambassador) {
+      sendShiftAssignedEmail(ambassador, shift.event, false).catch((err) => console.error('[SHIFT EMAIL]', err));
+    }
 
     res.json(updated);
   } catch (err) {
@@ -157,6 +161,9 @@ router.post('/:id/assign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'
         `You've been assigned to ${shift.event.title} on ${new Date(shift.event.date).toLocaleDateString()}.`,
         24
       );
+    }
+    if (updated.ambassador) {
+      sendShiftAssignedEmail(updated.ambassador, updated.event, true).catch((err) => console.error('[SHIFT EMAIL]', err));
     }
 
     res.json(updated);

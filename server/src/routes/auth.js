@@ -26,10 +26,11 @@ const safeUser = (user) => ({
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const { email: rawEmail, password } = req.body;
+    if (!rawEmail || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
+    const email = rawEmail.toLowerCase().trim();
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -44,10 +45,11 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, firstName, lastName, phone, role = 'AMBASSADOR' } = req.body;
-    if (!email || !password || !firstName || !lastName) {
+    const { email: rawEmail, password, firstName, lastName, phone, role = 'AMBASSADOR' } = req.body;
+    if (!rawEmail || !password || !firstName || !lastName) {
       return res.status(400).json({ error: 'Email, password, first and last name are required' });
     }
+    const email = rawEmail.toLowerCase().trim();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 

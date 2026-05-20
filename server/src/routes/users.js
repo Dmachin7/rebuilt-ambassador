@@ -127,10 +127,11 @@ router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
 // POST /api/users — create a new Brand Ambassador (admin or event coordinator)
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
-    const { email, password, firstName, lastName, phone } = req.body;
-    if (!email || !password || !firstName || !lastName) {
+    const { email: rawEmail, password, firstName, lastName, phone } = req.body;
+    if (!rawEmail || !password || !firstName || !lastName) {
       return res.status(400).json({ error: 'email, password, firstName, and lastName are required' });
     }
+    const email = rawEmail.toLowerCase().trim();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 

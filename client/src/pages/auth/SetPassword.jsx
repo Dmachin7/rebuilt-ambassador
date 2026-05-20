@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '../../api/client.js';
 
 export default function SetPassword() {
   const [searchParams] = useSearchParams();
@@ -20,17 +21,11 @@ export default function SetPassword() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/set-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) return setError(data.error || 'Something went wrong.');
+      await api.post('/auth/set-password', { token, password });
       setDone(true);
       setTimeout(() => navigate('/login'), 3000);
-    } catch {
-      setError('Network error. Please try again.');
+    } catch (err) {
+      setError(err.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }

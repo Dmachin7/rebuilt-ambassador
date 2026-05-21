@@ -5,7 +5,7 @@ import { formatCurrency, formatHours } from '../../utils/formatters.js';
 import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2 } from 'lucide-react';
 
 function AddAmbassadorModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '', lifetimeSalesCount: 0 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -96,6 +96,18 @@ function AddAmbassadorModal({ onClose, onCreated }) {
             <div>
               <label className="text-xs text-slate-500 block mb-1">Password *</label>
               <input type="text" className="input-field text-sm font-mono" value={form.password} onChange={f('password')} placeholder="Set a temporary password" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Prior Sales</label>
+              <input
+                type="number"
+                min="0"
+                className="input-field text-sm"
+                value={form.lifetimeSalesCount}
+                onChange={(e) => setForm({ ...form, lifetimeSalesCount: parseInt(e.target.value, 10) || 0 })}
+                placeholder="0"
+              />
+              <p className="text-xs text-slate-400 mt-1">Sales this ambassador made before joining this platform.</p>
             </div>
             <div className="flex gap-3 pt-1">
               <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>

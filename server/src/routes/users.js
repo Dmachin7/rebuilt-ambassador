@@ -127,7 +127,7 @@ router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
 // POST /api/users — create a new Brand Ambassador (admin or event coordinator)
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
-    const { email: rawEmail, password, firstName, lastName, phone } = req.body;
+    const { email: rawEmail, password, firstName, lastName, phone, lifetimeSalesCount } = req.body;
     if (!rawEmail || !password || !firstName || !lastName) {
       return res.status(400).json({ error: 'email, password, firstName, and lastName are required' });
     }
@@ -147,11 +147,12 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         lastName,
         phone: phone || null,
         role: 'AMBASSADOR',
+        lifetimeSalesCount: typeof lifetimeSalesCount === 'number' && lifetimeSalesCount > 0 ? lifetimeSalesCount : 0,
         resetToken: hashedToken,
         resetTokenExpiry: tokenExpiry,
       },
       select: {
-        id: true, email: true, role: true, firstName: true, lastName: true, phone: true, createdAt: true,
+        id: true, email: true, role: true, firstName: true, lastName: true, phone: true, lifetimeSalesCount: true, createdAt: true,
       },
     });
 

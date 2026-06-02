@@ -17,6 +17,7 @@ import AdminReports from './pages/admin/Reports.jsx';
 import AdminPayroll from './pages/admin/Payroll.jsx';
 import AdminMessages from './pages/admin/Messages.jsx';
 import AdminLeaderboard from './pages/admin/Leaderboard.jsx';
+import AdminStaff from './pages/admin/Staff.jsx';
 
 // Ambassador
 import AmbassadorLayout from './components/layout/AmbassadorLayout.jsx';
@@ -78,9 +79,10 @@ export default function App() {
             <Route path="events/:id" element={<EventDetail />} />
             <Route path="calendar" element={<AdminCalendar />} />
             <Route path="ambassadors" element={<AdminAmbassadors />} />
-            {/* Payroll and Reports — Admin only */}
+            {/* Payroll, Reports, and Staff — Admin only */}
             <Route path="reports" element={<AdminOnlyRoute><AdminReports /></AdminOnlyRoute>} />
             <Route path="payroll" element={<AdminOnlyRoute><AdminPayroll /></AdminOnlyRoute>} />
+            <Route path="staff" element={<AdminOnlyRoute><AdminStaff /></AdminOnlyRoute>} />
             <Route path="messages/:eventId" element={<AdminMessages />} />
             <Route path="messages" element={<AdminMessages />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />

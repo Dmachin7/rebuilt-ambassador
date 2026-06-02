@@ -25,26 +25,32 @@ async function send({ to, subject, html }) {
   }
 }
 
-async function sendWelcomeEmail(ambassador, setPasswordUrl) {
+async function sendWelcomeEmail(user, setPasswordUrl) {
+  const isCoord = user.role === 'EVENT_COORDINATOR';
+  const roleLabel = isCoord ? 'Event Coordinator' : 'Brand Ambassador';
+  const portalNote = isCoord
+    ? 'Once your password is set, log in to manage events, view shifts, and coordinate your team.'
+    : "Once your password is set, log in to see your upcoming shifts, check in to events, and track your earnings.";
+
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
-      <h1 style="color:#2d6a4f;margin-bottom:4px">Welcome to ReBuilt, ${ambassador.firstName}! 🎉</h1>
-      <p style="color:#555;margin-top:0">You've been added to the <strong>ReBuilt Brand Ambassador Program</strong>. We're excited to have you on the team.</p>
+      <h1 style="color:#2d6a4f;margin-bottom:4px">Welcome to ReBuilt, ${user.firstName}!</h1>
+      <p style="color:#555;margin-top:0">You've been added to the ReBuilt platform as a <strong>${roleLabel}</strong>. We're excited to have you on the team.</p>
       <hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>
       <h3 style="color:#333">Your account</h3>
-      <p style="color:#555"><strong>Email:</strong> ${ambassador.email}</p>
+      <p style="color:#555"><strong>Email:</strong> ${user.email}</p>
       <p style="color:#555">Before you can log in, you'll need to set your own password. Click the button below — the link expires in 72 hours.</p>
       <a href="${setPasswordUrl}" style="display:inline-block;margin:16px 0;padding:14px 28px;background:#2d6a4f;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px">
         Set My Password
       </a>
       <p style="color:#999;font-size:13px">If the button doesn't work, copy this link into your browser:<br/><span style="color:#2d6a4f">${setPasswordUrl}</span></p>
       <hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>
-      <p style="color:#555">Once your password is set, log in at <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">${process.env.FRONTEND_URL}</a> to see your upcoming shifts, check in to events, and track your earnings.</p>
-      <p style="color:#555">Questions? Reply to this email or contact your event coordinator.</p>
-      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
+      <p style="color:#555">${portalNote}</p>
+      <p style="color:#555">Log in at <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">${process.env.FRONTEND_URL}</a></p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Platform</p>
     </div>
   `;
-  await send({ to: ambassador.email, subject: 'Welcome to the ReBuilt Ambassador Program', html });
+  await send({ to: user.email, subject: `Welcome to ReBuilt — Set Your Password`, html });
 }
 
 async function sendShiftAssignedEmail(ambassador, event, isAssigned = true) {

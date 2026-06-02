@@ -124,13 +124,27 @@ router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
   }
 });
 
-// POST /api/users — create a new Brand Ambassador (admin or event coordinator)
+// POST /api/users — create a Brand Ambassador (admin or coord) or Event Coordinator (admin only)
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
-    const { email: rawEmail, password, firstName, lastName, phone, lifetimeSalesCount } = req.body;
-    if (!rawEmail || !password || !firstName || !lastName) {
-      return res.status(400).json({ error: 'email, password, firstName, and lastName are required' });
+    const { email: rawEmail, password, firstName, lastName, phone, lifetimeSalesCount, role: requestedRole } = req.body;
+
+    const isCoordinator = requestedRole === 'EVENT_COORDINATOR';
+    const isAdmin = requestedRole === 'ADMIN';
+    if ((isCoordinator || isAdmin) && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only admins can create admin or event coordinator accounts' });
     }
+    const role = isAdmin ? 'ADMIN' : isCoordinator ? 'EVENT_COORDINATOR' : 'AMBASSADOR';
+
+    if (!rawEmail || !firstName || !lastName) {
+      return res.status(400).json({ error: 'email, firstName, and lastName are required' });
+    }
+    // Password is required for ambassador creation; auto-generated for coordinator invite flow
+    const resolvedPassword = password || (isCoordinator ? crypto.randomBytes(16).toString('hex') : null);
+    if (!resolvedPassword) {
+      return res.status(400).json({ error: 'password is required' });
+    }
+
     const email = rawEmail.toLowerCase().trim();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
@@ -142,12 +156,12 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     const user = await prisma.user.create({
       data: {
         email,
-        passwordHash: bcrypt.hashSync(password, 10),
+        passwordHash: bcrypt.hashSync(resolvedPassword, 10),
         firstName,
         lastName,
         phone: phone || null,
-        role: 'AMBASSADOR',
-        lifetimeSalesCount: typeof lifetimeSalesCount === 'number' && lifetimeSalesCount > 0 ? lifetimeSalesCount : 0,
+        role,
+        lifetimeSalesCount: role === 'AMBASSADOR' && typeof lifetimeSalesCount === 'number' && lifetimeSalesCount > 0 ? lifetimeSalesCount : 0,
         resetToken: hashedToken,
         resetTokenExpiry: tokenExpiry,
       },
@@ -159,8 +173,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     const setPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/set-password?token=${rawToken}`;
     sendWelcomeEmail(user, setPasswordUrl).catch((err) => console.error('[WELCOME EMAIL]', err));
 
-    // Return the plain-text password once so the caller can still display it in the modal
-    res.status(201).json({ user, plainPassword: password });
+    res.status(201).json({ user, plainPassword: resolvedPassword, setPasswordUrl });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

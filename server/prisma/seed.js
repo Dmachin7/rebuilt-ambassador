@@ -7,9 +7,9 @@ const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
-// ── EDIT THESE ───────────────────────────────────────────────────────────────
-const ARTHUR_EMAIL = 'arthur@rebuiltmeals.com';
-const ARTHUR_PASSWORD = 'ReBuilt2024!';
+// ── EDIT THESE BEFORE RUNNING ────────────────────────────────────────────────
+const ARTHUR_EMAIL = 'YOUR_ADMIN_EMAIL_HERE';
+const ARTHUR_PASSWORD = 'YOUR_TEMP_PASSWORD_HERE';
 const ARTHUR_FIRST = 'Arthur';
 const ARTHUR_LAST = '';
 // ─────────────────────────────────────────────────────────────────────────────

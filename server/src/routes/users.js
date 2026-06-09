@@ -140,7 +140,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       return res.status(400).json({ error: 'email, firstName, and lastName are required' });
     }
     // Password is required for ambassador creation; auto-generated for coordinator invite flow
-    const resolvedPassword = password || (isCoordinator ? crypto.randomBytes(16).toString('hex') : null);
+    const resolvedPassword = password || (isCoordinator || isAdmin ? crypto.randomBytes(16).toString('hex') : null);
     if (!resolvedPassword) {
       return res.status(400).json({ error: 'password is required' });
     }

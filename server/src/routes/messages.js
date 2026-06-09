@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
+const { sendMessageNotificationEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -47,6 +48,38 @@ router.post('/:eventId', verifyToken, async (req, res) => {
         sender: { select: { id: true, firstName: true, lastName: true, role: true } },
       },
     });
+
+    // Fire-and-forget: email all participants except the sender
+    Promise.all([
+      prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } },
+        select: { id: true, email: true },
+      }),
+      prisma.shift.findMany({
+        where: {
+          eventId: req.params.eventId,
+          status: { in: ['ASSIGNED', 'CHECKED_IN', 'COMPLETED'] },
+          ambassador: { isNot: null },
+        },
+        include: { ambassador: { select: { id: true, email: true } } },
+      }),
+    ])
+      .then(([staff, shifts]) => {
+        const seen = new Set();
+        const recipients = [];
+        for (const u of [...staff, ...shifts.map((s) => s.ambassador).filter(Boolean)]) {
+          if (u.id !== req.user.id && !seen.has(u.email)) {
+            seen.add(u.email);
+            recipients.push(u.email);
+          }
+        }
+        if (recipients.length > 0) {
+          sendMessageNotificationEmail(recipients, message.sender, event, content.trim()).catch((err) =>
+            console.error('[MSG EMAIL]', err));
+        }
+      })
+      .catch((err) => console.error('[MSG NOTIFY]', err));
+
     res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });

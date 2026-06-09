@@ -3,14 +3,19 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 
+const DISPLAY_TZ = process.env.DISPLAY_TZ || 'America/New_York';
+
 function fmt(date) {
   return new Date(date).toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: DISPLAY_TZ,
   });
 }
 
 function fmtTime(date) {
-  return new Date(date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(date).toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit', timeZone: DISPLAY_TZ,
+  });
 }
 
 async function send({ to, subject, html }) {
@@ -166,6 +171,77 @@ async function sendWeeklyNotification(adminEmails, summary) {
   await send({ to: adminEmails, subject: `ReBuilt Weekly Summary: ${summary.weekStart} – ${summary.weekEnd}`, html });
 }
 
+async function sendShiftPickupEmail(staffEmails, ambassador, event, action) {
+  const actionLabel = action === 'claimed' ? 'picked up' : 'dropped';
+  const emoji = action === 'claimed' ? '✅' : '⚠️';
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">${emoji} Shift ${actionLabel}: ${event.title}</h2>
+      <p style="color:#555"><strong>${ambassador.firstName} ${ambassador.lastName}</strong> has ${actionLabel} a shift.</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
+        <p style="margin:6px 0;color:#333"><strong>Ambassador:</strong> ${ambassador.firstName} ${ambassador.lastName} · ${ambassador.email}</p>
+      </div>
+      <p style="color:#555">View this event in the <a href="${process.env.FRONTEND_URL}/admin/events" style="color:#2d6a4f">event dashboard</a>.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Platform</p>
+    </div>
+  `;
+  await send({
+    to: staffEmails,
+    subject: `Shift ${actionLabel}: ${ambassador.firstName} ${ambassador.lastName} — ${event.title}`,
+    html,
+  });
+}
+
+async function sendNewOpenEventEmail(ambassadorEmails, event, openShifts) {
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">📣 New Event Available: ${event.title}</h2>
+      <p style="color:#555">A new event has been posted with <strong>${openShifts} open shift${openShifts !== 1 ? 's' : ''}</strong> available for pickup!</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
+        ${event.notes ? `<p style="margin:6px 0;color:#555"><strong>Notes:</strong> ${event.notes}</p>` : ''}
+      </div>
+      <p style="color:#555">Log in to <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">your dashboard</a> to claim a shift before it's gone!</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
+    </div>
+  `;
+  await send({
+    to: ambassadorEmails,
+    subject: `New Shift Available: ${event.title} on ${fmt(event.date)}`,
+    html,
+  });
+}
+
+async function sendMessageNotificationEmail(recipientEmails, sender, event, messageContent) {
+  const preview = messageContent.length > 300 ? messageContent.slice(0, 300) + '…' : messageContent;
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">💬 New Message in ${event.title}</h2>
+      <p style="color:#555"><strong>${sender.firstName} ${sender.lastName}</strong> sent a message:</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border-left:4px solid #2d6a4f;border-top:1px solid #e0e0e0;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0">
+        <p style="margin:0;color:#333;font-size:15px;line-height:1.5">${preview}</p>
+      </div>
+      <div style="background:#f0f4f0;border-radius:6px;padding:12px 16px;margin:12px 0">
+        <p style="margin:0;color:#555;font-size:13px"><strong>Event:</strong> ${event.title} · ${fmt(event.date)}</p>
+      </div>
+      <p style="color:#555">Log in to <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">reply in the Event Messaging section</a>.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Platform</p>
+    </div>
+  `;
+  await send({
+    to: recipientEmails,
+    subject: `New Message: ${event.title} — from ${sender.firstName} ${sender.lastName}`,
+    html,
+  });
+}
+
 module.exports = {
   sendWelcomeEmail,
   sendShiftAssignedEmail,
@@ -173,4 +249,7 @@ module.exports = {
   sendPostEventRecapEmail,
   sendDailySummary,
   sendWeeklyNotification,
+  sendShiftPickupEmail,
+  sendNewOpenEventEmail,
+  sendMessageNotificationEmail,
 };

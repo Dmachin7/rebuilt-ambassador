@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { eventsAPI } from '../../api/index.js';
+import { eventsAPI, usersAPI } from '../../api/index.js';
 import { Card, Button, Badge, Modal, Input, Textarea, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatShortDate } from '../../utils/formatters.js';
 import { Plus, MapPin, Clock, Users, Trash2, Edit2 } from 'lucide-react';
@@ -11,6 +11,7 @@ const EMPTY_FORM = {
   startDate: '', startTime: '', endDate: '', endTime: '',
   setupTimeMins: 30, ambassadorsNeeded: 1,
   samplesNeeded: '', snackBitesNeeded: '', notes: '',
+  assignedAmbassadorIds: [],
 };
 
 // Extract local YYYY-MM-DD from a date value
@@ -124,12 +125,21 @@ export default function AdminEvents() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [ambassadors, setAmbassadors] = useState([]);
+  const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
 
   const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
 
   useEffect(() => { setLoading(true); load(); }, [filter]);
 
-  const openCreate = () => { setEditingEvent(null); setForm(EMPTY_FORM); setError(''); setModalOpen(true); };
+  const openCreate = () => {
+    setEditingEvent(null);
+    setForm(EMPTY_FORM);
+    setError('');
+    setAssignMode('open');
+    setModalOpen(true);
+    usersAPI.list('AMBASSADOR').then(setAmbassadors).catch(() => {});
+  };
 
   const openEdit = (e, event) => {
     e.preventDefault();
@@ -169,6 +179,7 @@ export default function AdminEvents() {
       if (editingEvent) {
         await eventsAPI.update(editingEvent.id, payload);
       } else {
+        payload.assignedAmbassadorIds = assignMode === 'assign' ? form.assignedAmbassadorIds : [];
         await eventsAPI.create(payload);
       }
       setModalOpen(false);
@@ -189,6 +200,16 @@ export default function AdminEvents() {
 
   const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
   const set = (field) => (val) => setForm((prev) => ({ ...prev, [field]: val }));
+
+  const toggleAmbassador = (id) => {
+    const limit = parseInt(form.ambassadorsNeeded) || 1;
+    setForm((prev) => {
+      const current = prev.assignedAmbassadorIds;
+      if (current.includes(id)) return { ...prev, assignedAmbassadorIds: current.filter((x) => x !== id) };
+      if (current.length >= limit) return prev;
+      return { ...prev, assignedAmbassadorIds: [...current, id] };
+    });
+  };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
@@ -319,6 +340,93 @@ export default function AdminEvents() {
           </div>
 
           <Textarea label="Notes" value={form.notes} onChange={f('notes')} rows={3} placeholder="Setup instructions, parking info, special notes..." />
+
+          {/* Ambassador assignment — create only */}
+          {!editingEvent && (
+            <div className="border-t border-slate-100 pt-4">
+              <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">Ambassador Assignment</p>
+              <div className="space-y-2 mb-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="assignMode"
+                    value="open"
+                    checked={assignMode === 'open'}
+                    onChange={() => { setAssignMode('open'); setForm((p) => ({ ...p, assignedAmbassadorIds: [] })); }}
+                    className="accent-mint-600"
+                  />
+                  <span className="text-sm text-slate-700">Leave shifts open for pickup</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="assignMode"
+                    value="assign"
+                    checked={assignMode === 'assign'}
+                    onChange={() => setAssignMode('assign')}
+                    className="accent-mint-600"
+                  />
+                  <span className="text-sm text-slate-700">Assign ambassadors now</span>
+                </label>
+              </div>
+
+              {assignMode === 'open' && (
+                <p className="text-xs text-slate-400 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  All ambassadors will be notified by email about this new event.
+                </p>
+              )}
+
+              {assignMode === 'assign' && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Select up to <strong>{form.ambassadorsNeeded}</strong> ambassador{form.ambassadorsNeeded > 1 ? 's' : ''} — remaining shifts stay open.
+                  </p>
+                  {ambassadors.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">No ambassadors found.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {ambassadors.map((amb) => {
+                        const selected = form.assignedAmbassadorIds.includes(amb.id);
+                        const limit = parseInt(form.ambassadorsNeeded) || 1;
+                        const atLimit = form.assignedAmbassadorIds.length >= limit && !selected;
+                        return (
+                          <label
+                            key={amb.id}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                              selected
+                                ? 'border-mint-400 bg-mint-50'
+                                : atLimit
+                                ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                                : 'border-slate-200 hover:border-mint-300 hover:bg-mint-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={atLimit}
+                              onChange={() => toggleAmbassador(amb.id)}
+                              className="accent-mint-600"
+                            />
+                            <span className="text-sm text-slate-700 flex-1">
+                              {amb.firstName} {amb.lastName}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${amb.isAvailable ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
+                              {amb.isAvailable ? 'Available' : 'Unavailable'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {form.assignedAmbassadorIds.length < (parseInt(form.ambassadorsNeeded) || 1) && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      {(parseInt(form.ambassadorsNeeded) || 1) - form.assignedAmbassadorIds.length} open shift{((parseInt(form.ambassadorsNeeded) || 1) - form.assignedAmbassadorIds.length) !== 1 ? 's' : ''} will be left open — all ambassadors will be notified.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>

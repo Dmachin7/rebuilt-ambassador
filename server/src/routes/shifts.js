@@ -5,7 +5,7 @@ const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
-const { sendShiftAssignedEmail } = require('../services/emailService');
+const { sendShiftAssignedEmail, sendShiftPickupEmail } = require('../services/emailService');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -125,6 +125,16 @@ router.post('/:id/claim', verifyToken, requireRole('AMBASSADOR'), async (req, re
     }
     if (ambassador) {
       sendShiftAssignedEmail(ambassador, shift.event, false).catch((err) => console.error('[SHIFT EMAIL]', err));
+
+      prisma.user.findMany({ where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } }, select: { email: true } })
+        .then((staff) => {
+          const emails = staff.map((u) => u.email);
+          if (emails.length > 0) {
+            sendShiftPickupEmail(emails, ambassador, shift.event, 'claimed').catch((err) =>
+              console.error('[PICKUP EMAIL]', err));
+          }
+        })
+        .catch((err) => console.error('[PICKUP NOTIFY]', err));
     }
 
     res.json(updated);
@@ -176,10 +186,31 @@ router.post('/:id/assign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'
 // POST /api/shifts/:id/unassign — admin or event coordinator
 router.post('/:id/unassign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
+    const before = await prisma.shift.findUnique({
+      where: { id: req.params.id },
+      include: {
+        event: true,
+        ambassador: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+
     const updated = await prisma.shift.update({
       where: { id: req.params.id },
       data: { ambassadorId: null, status: 'OPEN' },
     });
+
+    if (before?.ambassador && before?.event) {
+      prisma.user.findMany({ where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } }, select: { email: true } })
+        .then((staff) => {
+          const emails = staff.map((u) => u.email);
+          if (emails.length > 0) {
+            sendShiftPickupEmail(emails, before.ambassador, before.event, 'dropped').catch((err) =>
+              console.error('[DROP EMAIL]', err));
+          }
+        })
+        .catch((err) => console.error('[DROP NOTIFY]', err));
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });

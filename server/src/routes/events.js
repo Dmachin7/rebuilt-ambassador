@@ -3,7 +3,7 @@ const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { calculateDistanceFromHQ } = require('../stubs/maps');
-const { sendPostEventRecapEmail } = require('../services/emailService');
+const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -64,7 +64,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     const {
       title, location, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
-      samplesNeeded, snackBitesNeeded, notes,
+      samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
     } = req.body;
 
     if (!title || !location || !date) {
@@ -72,6 +72,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     }
 
     const distance = await calculateDistanceFromHQ(location);
+    const totalNeeded = parseInt(ambassadorsNeeded) || 1;
 
     const event = await prisma.event.create({
       data: {
@@ -86,7 +87,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         endTime: endTime ? new Date(endTime) : null,
         setupTimeMins: parseInt(setupTimeMins) || 30,
         breakdownTimeMins: parseInt(breakdownTimeMins) || 30,
-        ambassadorsNeeded: parseInt(ambassadorsNeeded) || 1,
+        ambassadorsNeeded: totalNeeded,
         samplesNeeded: samplesNeeded ? parseInt(samplesNeeded) : null,
         snackBitesNeeded: snackBitesNeeded ? parseInt(snackBitesNeeded) : null,
         notes,
@@ -94,17 +95,49 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       },
     });
 
-    // Auto-create OPEN shifts equal to ambassadorsNeeded
-    await Promise.all(
-      Array.from({ length: event.ambassadorsNeeded }, () =>
+    const assignedIds = Array.isArray(assignedAmbassadorIds)
+      ? assignedAmbassadorIds.filter(Boolean).slice(0, totalNeeded)
+      : [];
+    const openSlots = totalNeeded - assignedIds.length;
+
+    await Promise.all([
+      ...assignedIds.map((ambassadorId) =>
+        prisma.shift.create({ data: { eventId: event.id, ambassadorId, status: 'ASSIGNED' } })
+      ),
+      ...Array.from({ length: openSlots }, () =>
         prisma.shift.create({ data: { eventId: event.id, status: 'OPEN' } })
-      )
-    );
+      ),
+    ]);
 
     const full = await prisma.event.findUnique({
       where: { id: event.id },
       include: { shifts: true },
     });
+
+    // Email assigned ambassadors
+    if (assignedIds.length > 0) {
+      const assignedUsers = await prisma.user.findMany({
+        where: { id: { in: assignedIds } },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      });
+      assignedUsers.forEach((amb) => {
+        sendShiftAssignedEmail(amb, full, true).catch((err) => console.error('[ASSIGN EMAIL]', err));
+      });
+    }
+
+    // Email all ambassadors if there are open shifts
+    if (openSlots > 0) {
+      prisma.user.findMany({ where: { role: 'AMBASSADOR' }, select: { email: true } })
+        .then((ambassadors) => {
+          const emails = ambassadors.map((u) => u.email);
+          if (emails.length > 0) {
+            sendNewOpenEventEmail(emails, full, openSlots).catch((err) =>
+              console.error('[NEW EVENT EMAIL]', err));
+          }
+        })
+        .catch((err) => console.error('[NEW EVENT NOTIFY]', err));
+    }
+
     res.status(201).json(full);
   } catch (err) {
     console.error(err);

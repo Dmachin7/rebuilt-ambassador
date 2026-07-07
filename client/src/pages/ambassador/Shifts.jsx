@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { shiftsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Spinner, EmptyState } from '../../components/ui/index.jsx';
-import { formatShortDate, formatHours } from '../../utils/formatters.js';
+import { formatShortDate, formatHours, formatTime } from '../../utils/formatters.js';
 import { MapPin, Clock, Users } from 'lucide-react';
 
 export default function AmbassadorShifts() {
@@ -73,6 +73,9 @@ export default function AmbassadorShifts() {
                       <div className="space-y-1 text-xs text-slate-500">
                         <div className="flex items-start gap-1.5"><MapPin size={11} className="mt-0.5 shrink-0" /><span className="truncate">{shift.event.location}</span></div>
                         <div className="flex items-center gap-1.5"><Clock size={11} /><span className="text-mint-600 font-medium">{formatShortDate(shift.event.date)}</span></div>
+                        {shift.event.setupTimeMins > 0 && shift.event.arrivalTime && (
+                          <div className="text-orange-600 font-medium">Arrive by {formatTime(shift.event.arrivalTime)} ({shift.event.setupTimeMins}min setup)</div>
+                        )}
                         <div className="text-slate-400">💰 $20/hr · Setup {shift.event.setupTimeMins}min</div>
                       </div>
                       {shift.status === 'ASSIGNED' && (
@@ -135,6 +138,9 @@ export default function AmbassadorShifts() {
                 <div className="space-y-1 text-xs text-slate-500 mb-3">
                   <div className="flex items-start gap-1.5"><MapPin size={11} className="mt-0.5 shrink-0" /><span className="truncate">{shift.event.location}</span></div>
                   <div className="flex items-center gap-1.5"><Clock size={11} /><span className="text-mint-600 font-medium">{formatShortDate(shift.event.date)}</span></div>
+                  {shift.event.setupTimeMins > 0 && shift.event.arrivalTime && (
+                    <div className="text-orange-600 font-medium">Arrive by {formatTime(shift.event.arrivalTime)} ({shift.event.setupTimeMins}min setup)</div>
+                  )}
                   {shift.event.milesFromHq && (
                     <div className="text-slate-400">{shift.event.milesFromHq} mi · {shift.event.driveTimeMins} min drive from HQ</div>
                   )}

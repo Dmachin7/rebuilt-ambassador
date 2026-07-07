@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { calculateDistanceFromHQ } = require('../stubs/maps');
+const { withArrivalTime } = require('../lib/time');
 const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail } = require('../services/emailService');
 
 const router = express.Router();
@@ -24,7 +25,7 @@ router.get('/', verifyToken, async (req, res) => {
       },
       orderBy: { date: 'asc' },
     });
-    res.json(events);
+    res.json(events.map(withArrivalTime));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -51,7 +52,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       },
     });
     if (!event) return res.status(404).json({ error: 'Event not found' });
-    res.json(event);
+    res.json(withArrivalTime(event));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -71,7 +72,12 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       return res.status(400).json({ error: 'title, location, and date are required' });
     }
 
-    const distance = await calculateDistanceFromHQ(location);
+    let distance;
+    try {
+      distance = await calculateDistanceFromHQ(location);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}` });
+    }
     const totalNeeded = parseInt(ambassadorsNeeded) || 1;
 
     const event = await prisma.event.create({
@@ -138,7 +144,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         .catch((err) => console.error('[NEW EVENT NOTIFY]', err));
     }
 
-    res.status(201).json(full);
+    res.status(201).json(withArrivalTime(full));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -158,7 +164,16 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
 
     const data = {};
     if (title !== undefined) data.title = title;
-    if (location !== undefined) data.location = location;
+    if (location !== undefined) {
+      data.location = location;
+      try {
+        const distance = await calculateDistanceFromHQ(location);
+        data.milesFromHq = distance.miles;
+        data.driveTimeMins = distance.driveTimeMins;
+      } catch (err) {
+        return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}` });
+      }
+    }
     if (contactName !== undefined) data.contactName = contactName;
     if (contactPhone !== undefined) data.contactPhone = contactPhone;
     if (contactEmail !== undefined) data.contactEmail = contactEmail;
@@ -193,7 +208,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       }
     }
 
-    res.json(event);
+    res.json(withArrivalTime(event));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

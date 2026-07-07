@@ -6,34 +6,14 @@ const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
 const { sendShiftAssignedEmail, sendShiftPickupEmail } = require('../services/emailService');
+const { geocodeAddress, haversineDistance } = require('../lib/geo');
+const { withShiftArrivalTime } = require('../lib/time');
+const { MIN_PAID_HOURS } = require('../config/constants');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
 const CHECKIN_RADIUS_METERS = 91.44; // 300 feet
-
-async function geocodeAddress(address) {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'ReBuilt-Ambassador-Platform/1.0' },
-  });
-  const data = await res.json();
-  if (!data.length) throw new Error('Could not geocode event address');
-  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-}
-
-function haversineDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLng = (lng2 - lng1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 // GET /api/shifts/open
 router.get('/open', verifyToken, async (req, res) => {
@@ -46,7 +26,7 @@ router.get('/open', verifyToken, async (req, res) => {
       },
       orderBy: { event: { date: 'asc' } },
     });
-    res.json(shifts);
+    res.json(shifts.map(withShiftArrivalTime));
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -91,7 +71,7 @@ router.get('/', verifyToken, async (req, res) => {
       },
       orderBy: { event: { date: 'asc' } },
     });
-    res.json(shifts);
+    res.json(shifts.map(withShiftArrivalTime));
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -137,7 +117,7 @@ router.post('/:id/claim', verifyToken, requireRole('AMBASSADOR'), async (req, re
         .catch((err) => console.error('[PICKUP NOTIFY]', err));
     }
 
-    res.json(updated);
+    res.json(withShiftArrivalTime(updated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -176,7 +156,7 @@ router.post('/:id/assign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'
       sendShiftAssignedEmail(updated.ambassador, updated.event, true).catch((err) => console.error('[SHIFT EMAIL]', err));
     }
 
-    res.json(updated);
+    res.json(withShiftArrivalTime(updated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -267,7 +247,7 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
 // POST /api/shifts/:id/checkout
 router.post('/:id/checkout', verifyToken, async (req, res) => {
   try {
-    const shift = await prisma.shift.findUnique({ where: { id: req.params.id } });
+    const shift = await prisma.shift.findUnique({ where: { id: req.params.id }, include: { event: true } });
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     if (shift.ambassadorId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Not your shift' });
@@ -276,7 +256,9 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     if (shift.checkoutTime) return res.status(400).json({ error: 'Already checked out' });
 
     const checkoutTime = new Date();
-    const hoursWorked = Math.round(((checkoutTime - shift.checkinTime) / 3600000) * 100) / 100;
+    const onSiteHours = (checkoutTime - shift.checkinTime) / 3600000;
+    const roundTripDriveHours = ((shift.event.driveTimeMins || 0) * 2) / 60;
+    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours) * 100) / 100;
     const amount = Math.round(hoursWorked * 20 * 100) / 100;
 
     const updated = await prisma.shift.update({

@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
+const { MILEAGE_RATE } = require('../config/constants');
 
 const router = express.Router();
 
@@ -52,7 +53,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const hourlyPay = Math.round(hoursWorked * 20 * 100) / 100;
 
       const milesDriven = completedShifts.reduce((s, sh) => s + (sh.event?.milesFromHq || 0) * 2, 0); // round trip
-      const mileageReimbursement = Math.round(milesDriven * 0.30 * 100) / 100;
+      const mileageReimbursement = Math.round(milesDriven * MILEAGE_RATE * 100) / 100;
 
       const salesThisPeriod = completedShifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
       const lifetimeBefore = Math.max(0, (amb.lifetimeSalesCount || 0) - salesThisPeriod);
@@ -110,7 +111,7 @@ router.get('/export/csv', verifyToken, requireRole('ADMIN'), async (req, res) =>
 
     const rows = payments.map((p) => {
       const miles = (p.shift.event.milesFromHq || 0) * 2;
-      const mileageReimbursement = Math.round(miles * 0.30 * 100) / 100;
+      const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
       const salesThisShift = p.shift.report?.totalSales || 0;
       const lifetimeBefore = Math.max(0, (p.ambassador.lifetimeSalesCount || 0) - salesThisShift);
       const commission = calcCommission(lifetimeBefore, salesThisShift);

@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const { computeArrivalTime } = require('../lib/time');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.FROM_EMAIL || 'onboarding@resend.dev';
@@ -16,6 +17,11 @@ function fmtTime(date) {
   return new Date(date).toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', timeZone: DISPLAY_TZ,
   });
+}
+
+function arrivalLine(event) {
+  if (!event.setupTimeMins) return '';
+  return `<p style="margin:6px 0;color:#c2410c"><strong>Arrive by:</strong> ${fmtTime(computeArrivalTime(event))} (${event.setupTimeMins} min setup before start)</p>`;
 }
 
 async function send({ to, subject, html }) {
@@ -68,6 +74,7 @@ async function sendShiftAssignedEmail(ambassador, event, isAssigned = true) {
         <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
         <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
         ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        ${arrivalLine(event)}
         <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
         ${event.contactName ? `<p style="margin:6px 0;color:#333"><strong>On-Site Contact:</strong> ${event.contactName}${event.contactPhone ? ` · ${event.contactPhone}` : ''}</p>` : ''}
         ${event.notes ? `<p style="margin:6px 0;color:#555"><strong>Notes:</strong> ${event.notes}</p>` : ''}
@@ -90,9 +97,9 @@ async function sendEventReminderEmail(ambassador, event, hoursAway) {
         <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
         <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
         ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        ${arrivalLine(event)}
         <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
         ${event.contactName ? `<p style="margin:6px 0;color:#333"><strong>On-Site Contact:</strong> ${event.contactName}${event.contactPhone ? ` · ${event.contactPhone}` : ''}</p>` : ''}
-        ${event.setupTimeMins ? `<p style="margin:6px 0;color:#555"><strong>Setup time:</strong> ${event.setupTimeMins} min before start</p>` : ''}
       </div>
       <p style="color:#555">Open the app to check in when you arrive: <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">${process.env.FRONTEND_URL}</a></p>
       <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
@@ -205,6 +212,7 @@ async function sendNewOpenEventEmail(ambassadorEmails, event, openShifts) {
         <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
         <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
         ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        ${arrivalLine(event)}
         <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
         ${event.notes ? `<p style="margin:6px 0;color:#555"><strong>Notes:</strong> ${event.notes}</p>` : ''}
       </div>

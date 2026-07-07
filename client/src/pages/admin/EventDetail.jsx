@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
 import { Card, Button, Badge, Modal, Select, Spinner } from '../../components/ui/index.jsx';
-import { formatCurrency, formatDateTime, formatDate, formatHours } from '../../utils/formatters.js';
+import { formatCurrency, formatDateTime, formatDate, formatHours, formatTime } from '../../utils/formatters.js';
 import { ArrowLeft, MapPin, Phone, Mail, Clock, Users, UserPlus, MessageSquare } from 'lucide-react';
 
 export default function EventDetail() {
@@ -90,6 +90,13 @@ export default function EventDetail() {
                   <span className="text-slate-400 text-xs">→ {formatDateTime(event.endTime)}</span>
                 )}
               </div>
+              {event.setupTimeMins > 0 && event.arrivalTime && (
+                <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                  <Clock size={14} className="text-orange-500 shrink-0" />
+                  <span className="text-orange-700 text-sm font-medium">Ambassador arrival: {formatTime(event.arrivalTime)}</span>
+                  <span className="text-orange-500 text-xs">({event.setupTimeMins} min setup before start)</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <div className="bg-slate-50 rounded-lg p-3 text-center">
                   <div className="text-lg font-bold text-slate-800">{event.setupTimeMins}</div>

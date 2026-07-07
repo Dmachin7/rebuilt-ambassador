@@ -7,26 +7,6 @@ const { sendUrgentAlert } = require('../stubs/sms');
 
 const router = express.Router();
 
-// Commission calculation helper
-// lifetimeBefore = lifetime sales count BEFORE this period
-// salesThisPeriod = sales earned in this period
-function calcCommission(lifetimeBefore, salesThisPeriod) {
-  const THRESHOLD = 50;
-  const RATE_LOW = 10;
-  const RATE_HIGH = 20;
-
-  let commission = 0;
-  let remaining = salesThisPeriod;
-
-  if (lifetimeBefore < THRESHOLD) {
-    const atLowRate = Math.min(remaining, THRESHOLD - lifetimeBefore);
-    commission += atLowRate * RATE_LOW;
-    remaining -= atLowRate;
-  }
-  commission += remaining * RATE_HIGH;
-  return commission;
-}
-
 // GET /api/dashboard/admin
 router.get('/admin', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
@@ -144,7 +124,7 @@ router.get('/ambassador', verifyToken, requireRole('AMBASSADOR'), async (req, re
           shift: { ambassadorId },
           submittedAt: { gte: startOfMonth },
         },
-        select: { totalSales: true },
+        include: { sales: true },
       }),
     ]);
 
@@ -153,10 +133,12 @@ router.get('/ambassador', verifyToken, requireRole('AMBASSADOR'), async (req, re
       .filter((p) => new Date(p.createdAt) >= startOfMonth)
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // Commission for current month
-    const salesThisMonth = periodReports.reduce((s, r) => s + (r.totalSales || 0), 0);
-    const lifetimeBefore = Math.max(0, (userData?.lifetimeSalesCount || 0) - salesThisMonth);
-    const commissionThisMonth = calcCommission(lifetimeBefore, salesThisMonth);
+    // Commission for current month — only sales an admin has verified against Shopify count
+    const allSalesThisMonth = periodReports.flatMap((r) => r.sales);
+    const commissionThisMonth = allSalesThisMonth
+      .filter((s) => s.verified)
+      .reduce((sum, s) => sum + s.commission, 0);
+    const pendingSalesThisMonth = allSalesThisMonth.filter((s) => !s.verified).length;
 
     res.json({
       upcomingShifts,
@@ -167,6 +149,7 @@ router.get('/ambassador', verifyToken, requireRole('AMBASSADOR'), async (req, re
       isAvailable: userData?.isAvailable ?? true,
       lifetimeSalesCount: userData?.lifetimeSalesCount || 0,
       commissionThisMonth,
+      pendingSalesThisMonth,
     });
   } catch (err) {
     console.error(err);

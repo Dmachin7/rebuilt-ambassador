@@ -203,6 +203,41 @@ async function sendShiftPickupEmail(staffEmails, ambassador, event, action) {
   });
 }
 
+async function sendSalesVerificationEmail(staffEmails, event, ambassador, report) {
+  const ambassadorName = ambassador ? `${ambassador.firstName} ${ambassador.lastName}` : 'An ambassador';
+  const rows = report.sales.map((sale, i) => `
+    <tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee">#${i + 1}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee">${sale.overThreshold ? '$99+' : 'Under $99'}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right">$${sale.commission.toFixed(2)}</td>
+    </tr>
+  `).join('');
+  const potentialCommission = report.sales.reduce((s, sale) => s + sale.commission, 0);
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">🧾 Sales to Verify: ${event.title}</h2>
+      <p style="color:#555">${ambassadorName} reported <strong>${report.sales.length} sale${report.sales.length !== 1 ? 's' : ''}</strong> for this event. Check Shopify to confirm each sale's amount, then verify (or correct) it in the admin Reports page before payroll runs.</p>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #e0e0e0;margin:16px 0">
+        <thead><tr style="background:#2d6a4f;color:#fff">
+          <th style="padding:8px 12px;text-align:left">Sale</th>
+          <th style="padding:8px 12px;text-align:left">Ambassador's Claim</th>
+          <th style="padding:8px 12px;text-align:right">Commission (unverified)</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="color:#555;margin:0"><strong>Potential total commission:</strong> $${potentialCommission.toFixed(2)} (not yet payable — pending verification)</p>
+      <p style="color:#555;margin-top:16px">Verify each sale in the <a href="${process.env.FRONTEND_URL}/admin/reports" style="color:#2d6a4f">admin reports dashboard</a>.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
+    </div>
+  `;
+  await send({
+    to: staffEmails,
+    subject: `Verify Sales: ${ambassadorName} — ${event.title}`,
+    html,
+  });
+}
+
 async function sendNewOpenEventEmail(ambassadorEmails, event, openShifts) {
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
@@ -260,4 +295,5 @@ module.exports = {
   sendShiftPickupEmail,
   sendNewOpenEventEmail,
   sendMessageNotificationEmail,
+  sendSalesVerificationEmail,
 };

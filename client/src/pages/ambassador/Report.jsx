@@ -2,8 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { shiftsAPI, reportsAPI } from '../../api/index.js';
 import { Card, Button, Input, Textarea, Spinner } from '../../components/ui/index.jsx';
-import { formatShortDate } from '../../utils/formatters.js';
-import { CheckCircle } from 'lucide-react';
+import { formatShortDate, formatCurrency } from '../../utils/formatters.js';
+import { CheckCircle, Plus, Trash2 } from 'lucide-react';
+
+const COMMISSION_UNDER = 20;
+const COMMISSION_OVER = 40;
+let nextSaleId = 0;
 
 export default function ReportForm() {
   const { shiftId } = useParams();
@@ -19,13 +23,19 @@ export default function ReportForm() {
     feedback: '',
     issues: '',
     mealsSold: '',
-    totalSales: '',
   });
+  const [sales, setSales] = useState([]);
 
   const avgMeals =
-    form.mealsSold && form.totalSales && parseInt(form.totalSales) > 0
-      ? (parseInt(form.mealsSold) / parseInt(form.totalSales)).toFixed(1)
+    form.mealsSold && sales.length > 0
+      ? (parseInt(form.mealsSold) / sales.length).toFixed(1)
       : null;
+
+  const estimatedCommission = sales.reduce((s, sale) => s + (sale.overThreshold ? COMMISSION_OVER : COMMISSION_UNDER), 0);
+
+  const addSale = () => setSales((prev) => [...prev, { id: nextSaleId++, overThreshold: false }]);
+  const removeSale = (id) => setSales((prev) => prev.filter((s) => s.id !== id));
+  const toggleSale = (id) => setSales((prev) => prev.map((s) => (s.id === id ? { ...s, overThreshold: !s.overThreshold } : s)));
 
   useEffect(() => {
     shiftsAPI.list().then((shifts) => {
@@ -52,7 +62,7 @@ export default function ReportForm() {
         feedback: form.feedback,
         issues: form.issues || undefined,
         mealsSold: form.mealsSold || 0,
-        totalSales: form.totalSales || 0,
+        sales: sales.map((s) => ({ overThreshold: s.overThreshold })),
       });
       setSubmitted(true);
       setTimeout(() => navigate('/shifts'), 2500);
@@ -143,33 +153,70 @@ export default function ReportForm() {
         </Card>
 
         <Card className="p-4">
-          <p className="text-sm font-medium text-slate-700 mb-3">📊 Sales Numbers</p>
-          <div className="grid grid-cols-3 gap-3 items-end">
-            <Input
-              label="Total Meals Sold"
-              type="number"
-              min="0"
-              value={form.mealsSold}
-              onChange={f('mealsSold')}
-              placeholder="0"
-            />
-            <Input
-              label="Total Sales"
-              type="number"
-              min="0"
-              value={form.totalSales}
-              onChange={f('totalSales')}
-              placeholder="0"
-            />
-            <div className="text-center pb-1">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-sm font-medium text-slate-700">📊 Sales Numbers</p>
+            <div className="text-center">
               <div className={`text-lg font-bold ${avgMeals ? 'text-mint-600' : 'text-slate-300'}`}>
                 {avgMeals || '—'}
               </div>
               <div className="text-xs text-slate-400">Avg meals/sale</div>
             </div>
           </div>
+          <Input
+            label="Total Meals Sold"
+            type="number"
+            min="0"
+            value={form.mealsSold}
+            onChange={f('mealsSold')}
+            placeholder="0"
+          />
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-slate-700">💵 Sales & Commission</p>
+            <span className="text-xs text-slate-400">{sales.length} sale{sales.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          {sales.length === 0 ? (
+            <p className="text-xs text-slate-400 italic mb-3">No sales added yet. Tap "Add Sale" for each transaction.</p>
+          ) : (
+            <div className="space-y-2 mb-3">
+              {sales.map((sale, i) => (
+                <div key={sale.id} className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2.5">
+                  <span className="text-xs font-medium text-slate-500 w-12 shrink-0">Sale {i + 1}</span>
+                  <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sale.overThreshold}
+                      onChange={() => toggleSale(sale.id)}
+                      className="accent-mint-600"
+                    />
+                    <span className="text-sm text-slate-700">$99 or more</span>
+                  </label>
+                  <span className={`text-sm font-semibold ${sale.overThreshold ? 'text-mint-600' : 'text-slate-500'}`}>
+                    {formatCurrency(sale.overThreshold ? COMMISSION_OVER : COMMISSION_UNDER)}
+                  </span>
+                  <button type="button" onClick={() => removeSale(sale.id)} className="text-slate-300 hover:text-red-500 shrink-0">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Button type="button" variant="secondary" size="sm" onClick={addSale} className="w-full">
+            <Plus size={14} /> Add Sale
+          </Button>
+
+          {sales.length > 0 && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+              <span className="text-sm text-slate-600">Estimated commission</span>
+              <span className="text-lg font-bold text-mint-600">{formatCurrency(estimatedCommission)}</span>
+            </div>
+          )}
           <p className="text-xs text-slate-400 mt-2">
-            Avg meals/sale is auto-calculated · affects your leaderboard score (7+ avg = bonus points)
+            Leave "$99 or more" checked only if that sale's total was $99+. Admin will verify each sale against Shopify — commission isn't final until then.
           </p>
         </Card>
 

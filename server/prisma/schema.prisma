@@ -36,15 +36,15 @@ enum PaymentStatus {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  passwordHash   String
-  role           Role     @default(AMBASSADOR)
-  firstName      String
-  lastName       String
-  phone          String?
-  isAvailable    Boolean  @default(true)
-  lifetimeSalesCount Int  @default(0)
+  id                 String  @id @default(cuid())
+  email              String  @unique
+  passwordHash       String
+  role               Role    @default(AMBASSADOR)
+  firstName          String
+  lastName           String
+  phone              String?
+  isAvailable        Boolean @default(true)
+  lifetimeSalesCount Int     @default(0)
 
   // 1099 fields — encrypt ssnPlaceholder before storing in production
   legalName      String?
@@ -100,8 +100,8 @@ model Shift {
   checkinTime     DateTime?
   checkoutTime    DateTime?
   checkinPhotoUrl String?
-  reminder24hSent Boolean   @default(false)
-  reminder1hSent  Boolean   @default(false)
+  reminder24hSent Boolean     @default(false)
+  reminder1hSent  Boolean     @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,7 +122,23 @@ model Report {
   mealsPerSale Float?
   submittedAt  DateTime @default(now())
 
-  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  shift Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  sales Sale[]
+}
+
+// One row per individual sale reported by the ambassador. overThreshold is the
+// ambassador's claim ($99+ vs under); commission only counts toward payroll
+// once an admin verifies it against Shopify.
+model Sale {
+  id            String    @id @default(cuid())
+  reportId      String
+  overThreshold Boolean
+  commission    Float
+  verified      Boolean   @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 }
 
 model Payment {
@@ -152,17 +168,17 @@ model Message {
 }
 
 model LeaderboardEntry {
-  id                String   @id @default(cuid())
+  id                String @id @default(cuid())
   userId            String
   month             Int
   year              Int
-  promosWorked      Int      @default(0)
-  noZeroSalePromos  Int      @default(0)
-  strongPerformance Int      @default(0)
-  weeklyBenchmarks  Int      @default(0)
-  retentionPenalty  Int      @default(0)
-  avgMealsPerSale   Float    @default(0)
-  totalPoints       Int      @default(0)
+  promosWorked      Int    @default(0)
+  noZeroSalePromos  Int    @default(0)
+  strongPerformance Int    @default(0)
+  weeklyBenchmarks  Int    @default(0)
+  retentionPenalty  Int    @default(0)
+  avgMealsPerSale   Float  @default(0)
+  totalPoints       Int    @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

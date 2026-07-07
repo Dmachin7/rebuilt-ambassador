@@ -34,10 +34,8 @@ export default function AmbassadorDashboard() {
 
   const {
     upcomingShifts, lifetimeEarnings, currentPeriodEarnings, activeShift,
-    shiftsNeedingReport, isAvailable, lifetimeSalesCount, commissionThisMonth,
+    shiftsNeedingReport, isAvailable, lifetimeSalesCount, commissionThisMonth, pendingSalesThisMonth,
   } = data;
-
-  const atHighTier = lifetimeSalesCount >= 50;
 
   return (
     <div className="px-4 py-5 space-y-5 max-w-lg mx-auto">
@@ -109,25 +107,25 @@ export default function AmbassadorDashboard() {
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={16} className="text-mint-500" />
           <span className="text-sm font-semibold text-slate-700">Commission</span>
-          <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${atHighTier ? 'bg-mint-100 text-mint-700' : 'bg-slate-100 text-slate-500'}`}>
-            {atHighTier ? '$20/sale tier' : '$10/sale tier'}
-          </span>
+          {pendingSalesThisMonth > 0 && (
+            <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+              {pendingSalesThisMonth} pending verification
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-50 rounded-lg p-3 text-center">
             <div className="text-xl font-bold text-mint-600">{formatCurrency(commissionThisMonth)}</div>
-            <div className="text-xs text-slate-500 mt-0.5">This month</div>
+            <div className="text-xs text-slate-500 mt-0.5">This month (verified)</div>
           </div>
           <div className="bg-slate-50 rounded-lg p-3 text-center">
             <div className="text-xl font-bold text-slate-800">{lifetimeSalesCount}</div>
             <div className="text-xs text-slate-500 mt-0.5">Lifetime sales</div>
           </div>
         </div>
-        {!atHighTier && (
-          <p className="text-xs text-slate-400 mt-2">
-            {50 - lifetimeSalesCount} more sales to unlock $20/sale rate
-          </p>
-        )}
+        <p className="text-xs text-slate-400 mt-2">
+          $20/sale under $99 · $40/sale $99+ — commission is paid once an admin verifies each sale.
+        </p>
       </Card>
 
       {/* Quick actions */}

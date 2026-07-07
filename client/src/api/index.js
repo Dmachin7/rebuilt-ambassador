@@ -32,6 +32,8 @@ export const reportsAPI = {
   list: (eventId) => api.get(`/reports${eventId ? `?eventId=${eventId}` : ''}`),
   mine: () => api.get('/reports/mine'),
   create: (data) => api.post('/reports', data),
+  verifySale: (reportId, saleId, overThreshold) =>
+    api.put(`/reports/${reportId}/sales/${saleId}/verify`, { overThreshold }),
 };
 
 // Payments

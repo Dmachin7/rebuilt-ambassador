@@ -6,18 +6,13 @@ const { MILEAGE_RATE } = require('../config/constants');
 
 const router = express.Router();
 
-// Commission calculation: $10/sale for first 50 lifetime, $20/sale after
-function calcCommission(lifetimeBefore, salesThisPeriod) {
-  const THRESHOLD = 50;
-  let commission = 0;
-  let remaining = salesThisPeriod;
-  if (lifetimeBefore < THRESHOLD) {
-    const atLowRate = Math.min(remaining, THRESHOLD - lifetimeBefore);
-    commission += atLowRate * 10;
-    remaining -= atLowRate;
-  }
-  commission += remaining * 20;
-  return commission;
+// Commission only counts toward payroll once an admin has verified the sale against Shopify
+function verifiedCommission(sales) {
+  return (sales || []).filter((s) => s.verified).reduce((sum, s) => sum + s.commission, 0);
+}
+
+function pendingSaleCount(sales) {
+  return (sales || []).filter((s) => !s.verified).length;
 }
 
 // GET /api/payments/biweekly — bi-weekly payroll summary (admin only)
@@ -39,7 +34,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
           },
           include: {
             payment: true,
-            report: true,
+            report: { include: { sales: true } },
             event: { select: { milesFromHq: true } },
           },
         },
@@ -56,8 +51,10 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const mileageReimbursement = Math.round(milesDriven * MILEAGE_RATE * 100) / 100;
 
       const salesThisPeriod = completedShifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
-      const lifetimeBefore = Math.max(0, (amb.lifetimeSalesCount || 0) - salesThisPeriod);
-      const commissionEarned = calcCommission(lifetimeBefore, salesThisPeriod);
+      const commissionEarned = Math.round(
+        completedShifts.reduce((s, sh) => s + verifiedCommission(sh.report?.sales), 0) * 100
+      ) / 100;
+      const pendingSales = completedShifts.reduce((s, sh) => s + pendingSaleCount(sh.report?.sales), 0);
 
       const totalPayout = Math.round((hourlyPay + mileageReimbursement + commissionEarned) * 100) / 100;
 
@@ -73,6 +70,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
         mileageReimbursement,
         salesThisPeriod,
         commissionEarned,
+        pendingSales,
         totalPayout,
         shiftCount: completedShifts.length,
       };
@@ -94,7 +92,7 @@ router.get('/export/csv', verifyToken, requireRole('ADMIN'), async (req, res) =>
         shift: {
           include: {
             event: true,
-            report: true,
+            report: { include: { sales: true } },
           },
         },
       },
@@ -106,15 +104,15 @@ router.get('/export/csv', verifyToken, requireRole('ADMIN'), async (req, res) =>
       'Phone', 'Address', 'SSN (Placeholder)', 'Event', 'Event Date',
       'Check-In Time', 'Check-Out Time', 'Hours Worked', 'Hourly Pay',
       'Miles Driven', 'Mileage Reimbursement', 'Total Meals Sold', 'Total Sales',
-      'Avg Meals/Sale', 'Commission Earned', 'Total Payout',
+      'Avg Meals/Sale', 'Commission Earned', 'Pending Sales', 'Total Payout',
     ];
 
     const rows = payments.map((p) => {
       const miles = (p.shift.event.milesFromHq || 0) * 2;
       const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
       const salesThisShift = p.shift.report?.totalSales || 0;
-      const lifetimeBefore = Math.max(0, (p.ambassador.lifetimeSalesCount || 0) - salesThisShift);
-      const commission = calcCommission(lifetimeBefore, salesThisShift);
+      const commission = verifiedCommission(p.shift.report?.sales);
+      const pending = pendingSaleCount(p.shift.report?.sales);
       const totalPayout = p.amount + mileageReimbursement + commission;
 
       return [
@@ -139,6 +137,7 @@ router.get('/export/csv', verifyToken, requireRole('ADMIN'), async (req, res) =>
         salesThisShift,
         p.shift.report?.mealsPerSale?.toFixed(1) ?? '',
         `$${commission.toFixed(2)}`,
+        pending,
         `$${totalPayout.toFixed(2)}`,
       ];
     });

@@ -7,4 +7,16 @@ const MILEAGE_RATE = 0.30;
 // Minimum paid hours per shift, inclusive of round-trip drive time
 const MIN_PAID_HOURS = 4;
 
-module.exports = { HQ_ADDRESS, MILEAGE_RATE, MIN_PAID_HOURS };
+// Per-sale commission tiers, based on the sale's dollar amount
+const SALE_AMOUNT_THRESHOLD = 99;
+const COMMISSION_UNDER_THRESHOLD = 20;
+const COMMISSION_OVER_THRESHOLD = 40;
+
+module.exports = {
+  HQ_ADDRESS,
+  MILEAGE_RATE,
+  MIN_PAID_HOURS,
+  SALE_AMOUNT_THRESHOLD,
+  COMMISSION_UNDER_THRESHOLD,
+  COMMISSION_OVER_THRESHOLD,
+};

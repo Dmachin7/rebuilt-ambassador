@@ -1,25 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { eventsAPI, reportsAPI } from '../../api/index.js';
-import { Card, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
-import { formatDate, formatDateTime } from '../../utils/formatters.js';
+import { Card, Select, Spinner, EmptyState, Button } from '../../components/ui/index.jsx';
+import { formatDate, formatDateTime, formatCurrency } from '../../utils/formatters.js';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function AdminReports() {
   const [reports, setReports] = useState([]);
   const [events, setEvents] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [drafts, setDrafts] = useState({}); // saleId -> overThreshold override before confirming
+  const [verifyingId, setVerifyingId] = useState(null);
 
-  useEffect(() => {
+  const load = () =>
     Promise.all([reportsAPI.list(filter || undefined), eventsAPI.list()])
-      .then(([r, e]) => { setReports(r); setEvents(e); })
-      .finally(() => setLoading(false));
-  }, [filter]);
+      .then(([r, e]) => { setReports(r); setEvents(e); });
 
+  useEffect(() => { setLoading(true); load().finally(() => setLoading(false)); }, [filter]);
+
+  const handleVerify = async (reportId, sale) => {
+    const overThreshold = drafts[sale.id] ?? sale.overThreshold;
+    setVerifyingId(sale.id);
+    try {
+      await reportsAPI.verifySale(reportId, sale.id, overThreshold);
+      await load();
+    } catch (err) {
+      alert('Failed to verify sale: ' + err.message);
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const allSales = reports.flatMap((r) => r.sales || []);
   const totalMealsSold = reports.reduce((s, r) => s + (r.mealsSold || 0), 0);
   const totalSalesCount = reports.reduce((s, r) => s + (r.totalSales || 0), 0);
   const avgMeals =
     reports.filter((r) => r.mealsPerSale).reduce((s, r) => s + r.mealsPerSale, 0) /
     (reports.filter((r) => r.mealsPerSale).length || 1);
+  const pendingCount = allSales.filter((s) => !s.verified).length;
+  const verifiedCommission = allSales.filter((s) => s.verified).reduce((s, sale) => s + sale.commission, 0);
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
@@ -31,7 +50,7 @@ export default function AdminReports() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-slate-800">{totalMealsSold}</div>
           <div className="text-xs text-slate-500 mt-1">Total Meals Sold</div>
@@ -43,6 +62,14 @@ export default function AdminReports() {
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-mint-600">{avgMeals.toFixed(1)}</div>
           <div className="text-xs text-slate-500 mt-1">Avg Meals/Sale</div>
+        </Card>
+        <Card className={`p-4 text-center ${pendingCount > 0 ? 'border-orange-200 bg-orange-50' : ''}`}>
+          <div className={`text-2xl font-bold ${pendingCount > 0 ? 'text-orange-600' : 'text-slate-800'}`}>{pendingCount}</div>
+          <div className="text-xs text-slate-500 mt-1">Sales Pending Verification</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold text-mint-600">{formatCurrency(verifiedCommission)}</div>
+          <div className="text-xs text-slate-500 mt-1">Verified Commission</div>
         </Card>
       </div>
 
@@ -86,6 +113,56 @@ export default function AdminReports() {
                   )}
                 </div>
               </div>
+              {report.sales?.length > 0 && (
+                <div className="border border-slate-100 rounded-lg overflow-hidden mb-3">
+                  <div className="bg-slate-50 px-3 py-2 flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Sales Verification</p>
+                    <p className="text-xs text-slate-400">
+                      {report.sales.filter((s) => s.verified).length}/{report.sales.length} verified
+                    </p>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {report.sales.map((sale, i) => {
+                      const draftValue = drafts[sale.id] ?? sale.overThreshold;
+                      return (
+                        <div key={sale.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                          <span className="text-xs text-slate-400 w-12 shrink-0">Sale {i + 1}</span>
+                          {sale.verified ? (
+                            <>
+                              <span className="flex items-center gap-1 text-green-600 flex-1">
+                                <CheckCircle2 size={14} /> Verified · {sale.overThreshold ? '$99+' : 'Under $99'}
+                              </span>
+                              <span className="font-semibold text-slate-700">{formatCurrency(sale.commission)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={draftValue}
+                                  onChange={(e) => setDrafts((prev) => ({ ...prev, [sale.id]: e.target.checked }))}
+                                  className="accent-mint-600"
+                                />
+                                <span className="text-slate-700">$99 or more</span>
+                                <span className="text-xs text-slate-400">(ambassador said {sale.overThreshold ? '$99+' : 'under $99'})</span>
+                              </label>
+                              <span className="font-semibold text-orange-600">{formatCurrency(draftValue ? 40 : 20)}</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleVerify(report.id, sale)}
+                                disabled={verifyingId === sale.id}
+                              >
+                                {verifyingId === sale.id ? '...' : 'Confirm'}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="bg-slate-50 rounded-lg p-3 mb-2">
                 <p className="text-xs font-medium text-slate-500 mb-1">Feedback</p>
                 <p className="text-sm text-slate-700">{report.feedback}</p>

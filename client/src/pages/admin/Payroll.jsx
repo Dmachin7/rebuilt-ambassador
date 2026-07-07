@@ -34,13 +34,13 @@ function BiweeklySummary() {
     const headers = [
       'First Name', 'Last Name', 'Email', 'Shifts', 'Hours Worked',
       'Hourly Pay', 'Miles Driven', 'Mileage Reimbursement',
-      'Sales This Period', 'Commission Earned', 'Total Payout', 'Lifetime Sales',
+      'Sales This Period', 'Commission Earned', 'Pending Sales', 'Total Payout', 'Lifetime Sales',
     ];
     const rows = summary.summary.map((r) => [
       r.firstName, r.lastName, r.email, r.shiftCount,
       r.hoursWorked.toFixed(2), `$${r.hourlyPay.toFixed(2)}`,
       r.milesDriven.toFixed(1), `$${r.mileageReimbursement.toFixed(2)}`,
-      r.salesThisPeriod, `$${r.commissionEarned.toFixed(2)}`,
+      r.salesThisPeriod, `$${r.commissionEarned.toFixed(2)}`, r.pendingSales,
       `$${r.totalPayout.toFixed(2)}`, r.lifetimeSalesCount,
     ]);
     const escape = (v) => `"${String(v).replace(/"/g, '""')}"`;
@@ -146,7 +146,12 @@ function BiweeklySummary() {
                       <td className="px-4 py-3 text-right text-slate-600">{r.milesDriven.toFixed(1)}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(r.mileageReimbursement)}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{r.salesThisPeriod}</td>
-                      <td className="px-4 py-3 text-right text-mint-700 font-medium">{formatCurrency(r.commissionEarned)}</td>
+                      <td className="px-4 py-3 text-right text-mint-700 font-medium">
+                        {formatCurrency(r.commissionEarned)}
+                        {r.pendingSales > 0 && (
+                          <div className="text-xs text-orange-500 font-normal">{r.pendingSales} pending</div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right font-bold text-slate-800">{formatCurrency(r.totalPayout)}</td>
                     </tr>
                   ))}
@@ -155,7 +160,7 @@ function BiweeklySummary() {
             </div>
           </Card>
           <p className="text-xs text-slate-400">
-            Commission: $10/sale for first 50 lifetime sales · $20/sale thereafter · Mileage: $0.30/mile (round-trip)
+            Commission: $20/sale under $99 · $40/sale $99+ (only once admin-verified in Reports) · Mileage: $0.30/mile (round-trip)
           </p>
         </>
       )}

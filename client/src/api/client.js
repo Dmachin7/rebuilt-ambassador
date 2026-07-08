@@ -17,7 +17,7 @@ async function request(path, options = {}) {
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), data);
   return data;
 }
 

@@ -8,12 +8,10 @@ const { uploadPhoto } = require('../stubs/storage');
 const { sendShiftAssignedEmail, sendShiftPickupEmail } = require('../services/emailService');
 const { geocodeAddress, haversineDistance } = require('../lib/geo');
 const { withShiftArrivalTime } = require('../lib/time');
-const { MIN_PAID_HOURS } = require('../config/constants');
+const { MIN_PAID_HOURS, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
-
-const CHECKIN_RADIUS_METERS = 91.44; // 300 feet
 
 // GET /api/shifts/open
 router.get('/open', verifyToken, async (req, res) => {
@@ -220,7 +218,14 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
     const eventCoords = await geocodeAddress(shift.event.location);
     const distance = haversineDistance(ambassadorLat, ambassadorLng, eventCoords.lat, eventCoords.lng);
 
-    if (distance > CHECKIN_RADIUS_METERS) {
+    // Give benefit of the doubt up to the device's own reported GPS accuracy (capped) — phones
+    // and especially laptops often report low-confidence locations that can be off by hundreds
+    // of feet even when the ambassador is genuinely on-site.
+    const reportedAccuracy = parseFloat(req.body.accuracy);
+    const accuracyGrace = isNaN(reportedAccuracy) ? 0 : Math.min(reportedAccuracy, CHECKIN_MAX_ACCURACY_GRACE_METERS);
+    const effectiveRadius = CHECKIN_RADIUS_METERS + accuracyGrace;
+
+    if (distance > effectiveRadius) {
       const feet = Math.round(distance * 3.28084);
       return res.status(400).json({
         error: `You are ${feet}ft from the event location. You must be within 300ft to check in.`,

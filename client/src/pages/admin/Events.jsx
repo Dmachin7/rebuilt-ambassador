@@ -127,6 +127,7 @@ export default function AdminEvents() {
   const [error, setError] = useState('');
   const [ambassadors, setAmbassadors] = useState([]);
   const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
+  const [manualDistance, setManualDistance] = useState(null); // { milesFromHq, driveTimeMins } | null — shown when auto geocoding fails
 
   const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
 
@@ -136,6 +137,7 @@ export default function AdminEvents() {
     setEditingEvent(null);
     setForm(EMPTY_FORM);
     setError('');
+    setManualDistance(null);
     setAssignMode('open');
     setModalOpen(true);
     usersAPI.list('AMBASSADOR').then(setAmbassadors).catch(() => {});
@@ -161,6 +163,7 @@ export default function AdminEvents() {
       notes: event.notes || '',
     });
     setError('');
+    setManualDistance(null);
     setModalOpen(true);
   };
 
@@ -169,13 +172,22 @@ export default function AdminEvents() {
       setError('Title, location, and start date are required');
       return;
     }
+    if (manualDistance && (manualDistance.milesFromHq === '' || manualDistance.driveTimeMins === '')) {
+      setError('Enter both miles and drive time, or fix the address so it can be calculated automatically');
+      return;
+    }
     setSaving(true);
+    setError('');
     try {
       const payload = {
         ...form,
         date: combineDatetime(form.startDate, form.startTime),
         endTime: form.endDate ? combineDatetime(form.endDate, form.endTime) : null,
       };
+      if (manualDistance) {
+        payload.milesFromHq = manualDistance.milesFromHq;
+        payload.driveTimeMins = manualDistance.driveTimeMins;
+      }
       if (editingEvent) {
         await eventsAPI.update(editingEvent.id, payload);
       } else {
@@ -186,6 +198,7 @@ export default function AdminEvents() {
       load();
     } catch (err) {
       setError(err.message);
+      if (err.geocodeFailed) setManualDistance({ milesFromHq: '', driveTimeMins: '' });
     } finally {
       setSaving(false);
     }
@@ -292,8 +305,35 @@ export default function AdminEvents() {
 
           <LocationAutocomplete
             value={form.location}
-            onChange={set('location')}
+            onChange={(val) => { set('location')(val); setManualDistance(null); setError(''); }}
           />
+
+          {manualDistance && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-3">
+              <p className="text-xs text-orange-700">
+                We couldn't automatically calculate the drive distance for this address. Look it up in Google Maps and enter it manually.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Miles from HQ"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={manualDistance.milesFromHq}
+                  onChange={(e) => setManualDistance((prev) => ({ ...prev, milesFromHq: e.target.value }))}
+                  placeholder="0.0"
+                />
+                <Input
+                  label="Drive Time (mins)"
+                  type="number"
+                  min="0"
+                  value={manualDistance.driveTimeMins}
+                  onChange={(e) => setManualDistance((prev) => ({ ...prev, driveTimeMins: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Start</p>

@@ -9,6 +9,7 @@ export const getCurrentLocation = () => {
         resolve({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
         });
       },
       (error) => {

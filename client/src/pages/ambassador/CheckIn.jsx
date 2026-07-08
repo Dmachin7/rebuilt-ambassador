@@ -49,6 +49,7 @@ export default function CheckIn() {
       if (photo) formData.append('photo', photo);
       formData.append('lat', gps.lat);
       formData.append('lng', gps.lng);
+      if (gps.accuracy != null) formData.append('accuracy', gps.accuracy);
 
       await shiftsAPI.checkin(targetShift.id, formData);
       setDone(true);

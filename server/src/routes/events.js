@@ -66,17 +66,23 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       title, location, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
+      milesFromHq, driveTimeMins,
     } = req.body;
 
     if (!title || !location || !date) {
       return res.status(400).json({ error: 'title, location, and date are required' });
     }
 
-    let distance;
-    try {
-      distance = await calculateDistanceFromHQ(location);
-    } catch (err) {
-      return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}` });
+    // Manual override, for addresses the free geocoder can't find
+    let distance = milesFromHq !== undefined && driveTimeMins !== undefined
+      ? { miles: parseFloat(milesFromHq), driveTimeMins: parseInt(driveTimeMins) }
+      : null;
+    if (!distance) {
+      try {
+        distance = await calculateDistanceFromHQ(location);
+      } catch (err) {
+        return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}`, geocodeFailed: true });
+      }
     }
     const totalNeeded = parseInt(ambassadorsNeeded) || 1;
 
@@ -158,6 +164,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       title, location, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, status,
+      milesFromHq, driveTimeMins,
     } = req.body;
 
     const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true } });
@@ -166,12 +173,18 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (title !== undefined) data.title = title;
     if (location !== undefined) {
       data.location = location;
-      try {
-        const distance = await calculateDistanceFromHQ(location);
-        data.milesFromHq = distance.miles;
-        data.driveTimeMins = distance.driveTimeMins;
-      } catch (err) {
-        return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}` });
+      // Manual override, for addresses the free geocoder can't find
+      if (milesFromHq !== undefined && driveTimeMins !== undefined) {
+        data.milesFromHq = parseFloat(milesFromHq);
+        data.driveTimeMins = parseInt(driveTimeMins);
+      } else {
+        try {
+          const distance = await calculateDistanceFromHQ(location);
+          data.milesFromHq = distance.miles;
+          data.driveTimeMins = distance.driveTimeMins;
+        } catch (err) {
+          return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}`, geocodeFailed: true });
+        }
       }
     }
     if (contactName !== undefined) data.contactName = contactName;

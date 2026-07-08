@@ -17,6 +17,7 @@ export default function CheckIn() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle'); // idle | checking | ok | error
   const [done, setDone] = useState(false);
+  const [locationIssue, setLocationIssue] = useState(null); // { distanceFeet } | null — offers a manual override
   const fileRef = useRef(null);
 
   const loadShifts = async () => {
@@ -38,7 +39,7 @@ export default function CheckIn() {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  const handleCheckin = async (targetShift) => {
+  const handleCheckin = async (targetShift, override = false) => {
     setChecking(true);
     setLocationStatus('checking');
     try {
@@ -50,13 +51,20 @@ export default function CheckIn() {
       formData.append('lat', gps.lat);
       formData.append('lng', gps.lng);
       if (gps.accuracy != null) formData.append('accuracy', gps.accuracy);
+      if (override) formData.append('locationOverride', 'true');
 
       await shiftsAPI.checkin(targetShift.id, formData);
+      setLocationIssue(null);
       setDone(true);
       setTimeout(() => navigate('/shifts'), 2000);
     } catch (err) {
       setLocationStatus('error');
-      alert('Check-in failed: ' + err.message);
+      if (err.distanceFeet !== undefined && !override) {
+        setLocationIssue({ distanceFeet: err.distanceFeet });
+      } else {
+        setLocationIssue(null);
+        alert('Check-in failed: ' + err.message);
+      }
     } finally {
       setChecking(false);
     }
@@ -111,7 +119,7 @@ export default function CheckIn() {
         <h1 className="text-xl font-bold text-slate-800">Check In</h1>
         <p className="text-sm text-slate-500">Select a shift to check in to:</p>
         {assignedShifts.map((s) => (
-          <Card key={s.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShift(s)}>
+          <Card key={s.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setShift(s); setLocationIssue(null); }}>
             <div className="font-medium text-slate-800">{s.event.title}</div>
             <div className="text-xs text-slate-500 mt-1">{formatShortDate(s.event.date)}</div>
           </Card>
@@ -158,8 +166,25 @@ export default function CheckIn() {
           </div>
           <div className={`w-3 h-3 rounded-full ${locationStatus === 'ok' ? 'bg-green-400' : locationStatus === 'error' ? 'bg-red-400' : 'bg-slate-200'}`} />
         </div>
-        <p className="text-xs text-slate-400 mt-2">Must be within 300ft of the event location to check in.</p>
+        <p className="text-xs text-slate-400 mt-2">Must be within 1000ft of the event location to check in.</p>
       </Card>
+
+      {/* Location override — shown when the geofence check fails */}
+      {locationIssue && (
+        <Card className="p-4 border-orange-200 bg-orange-50">
+          <p className="text-sm text-orange-700">
+            You appear to be about {locationIssue.distanceFeet}ft from the event location. If you're at the right place and your phone's GPS is having trouble, you can check in anyway.
+          </p>
+          <Button
+            onClick={() => handleCheckin(targetShift, true)}
+            disabled={checking}
+            variant="secondary"
+            className="w-full mt-3"
+          >
+            {checking ? 'Checking in...' : 'Check In Anyway'}
+          </Button>
+        </Card>
+      )}
 
       {/* Photo upload — only for check-in */}
       {!isCheckedIn && (

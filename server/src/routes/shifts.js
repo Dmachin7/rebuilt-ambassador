@@ -8,7 +8,7 @@ const { uploadPhoto } = require('../stubs/storage');
 const { sendShiftAssignedEmail, sendShiftPickupEmail } = require('../services/emailService');
 const { geocodeAddress, haversineDistance } = require('../lib/geo');
 const { withShiftArrivalTime } = require('../lib/time');
-const { MIN_PAID_HOURS, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
+const { MIN_PAID_HOURS, CHECKIN_RADIUS_FEET, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -225,10 +225,14 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
     const accuracyGrace = isNaN(reportedAccuracy) ? 0 : Math.min(reportedAccuracy, CHECKIN_MAX_ACCURACY_GRACE_METERS);
     const effectiveRadius = CHECKIN_RADIUS_METERS + accuracyGrace;
 
-    if (distance > effectiveRadius) {
+    const withinRadius = distance <= effectiveRadius;
+    const overrideRequested = req.body.locationOverride === 'true' || req.body.locationOverride === true;
+
+    if (!withinRadius && !overrideRequested) {
       const feet = Math.round(distance * 3.28084);
       return res.status(400).json({
-        error: `You are ${feet}ft from the event location. You must be within 300ft to check in.`,
+        error: `You are ${feet}ft from the event location. You must be within ${CHECKIN_RADIUS_FEET}ft to check in.`,
+        distanceFeet: feet,
       });
     }
 
@@ -240,6 +244,7 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
         checkinTime: new Date(),
         checkinPhotoUrl: photoResult.url,
         status: 'CHECKED_IN',
+        locationOverride: !withinRadius,
       },
     });
     res.json(updated);

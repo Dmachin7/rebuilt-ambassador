@@ -145,6 +145,9 @@ export default function EventDetail() {
                             <div className="text-xs text-slate-400">
                               In: {formatDateTime(shift.checkinTime)}
                               {shift.checkoutTime && ` · Out: ${formatDateTime(shift.checkoutTime)}`}
+                              {shift.locationOverride && (
+                                <span className="ml-1.5 text-orange-500 font-medium">· 📍 location override used</span>
+                              )}
                             </div>
                           )}
                         </div>

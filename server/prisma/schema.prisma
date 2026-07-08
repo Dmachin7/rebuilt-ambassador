@@ -93,15 +93,16 @@ model Event {
 }
 
 model Shift {
-  id              String      @id @default(cuid())
-  eventId         String
-  ambassadorId    String?
-  status          ShiftStatus @default(OPEN)
-  checkinTime     DateTime?
-  checkoutTime    DateTime?
-  checkinPhotoUrl String?
-  reminder24hSent Boolean     @default(false)
-  reminder1hSent  Boolean     @default(false)
+  id               String      @id @default(cuid())
+  eventId          String
+  ambassadorId     String?
+  status           ShiftStatus @default(OPEN)
+  checkinTime      DateTime?
+  checkoutTime     DateTime?
+  checkinPhotoUrl  String?
+  locationOverride Boolean     @default(false)
+  reminder24hSent  Boolean     @default(false)
+  reminder1hSent   Boolean     @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
-const { MILEAGE_RATE } = require('../config/constants');
+const { MILEAGE_RATE, HOURLY_RATE } = require('../config/constants');
 
 const router = express.Router();
 
@@ -13,6 +13,29 @@ function verifiedCommission(sales) {
 
 function pendingSaleCount(sales) {
   return (sales || []).filter((s) => !s.verified).length;
+}
+
+// Adds a read-only pay/reimbursement breakdown to a Payment (with shift.event included) without
+// persisting new columns — mirrors the on-the-fly mileage math used elsewhere in this file.
+function withBreakdown(payment) {
+  const event = payment.shift?.event;
+  const onSiteHours = payment.shift?.checkinTime && payment.shift?.checkoutTime
+    ? (new Date(payment.shift.checkoutTime) - new Date(payment.shift.checkinTime)) / 3600000
+    : null;
+  const driveTimeHours = ((event?.driveTimeMins || 0) * 2) / 60;
+  const setupTimeHours = (event?.setupTimeMins || 0) / 60;
+  const miles = (event?.milesFromHq || 0) * 2;
+  const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
+  return {
+    ...payment,
+    breakdown: {
+      onSiteHours: onSiteHours !== null ? Math.round(onSiteHours * 100) / 100 : null,
+      driveTimeHours: Math.round(driveTimeHours * 100) / 100,
+      setupTimeHours: Math.round(setupTimeHours * 100) / 100,
+      miles: Math.round(miles * 10) / 10,
+      mileageReimbursement,
+    },
+  };
 }
 
 // GET /api/payments/biweekly — bi-weekly payroll summary (admin only)
@@ -35,7 +58,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
           include: {
             payment: true,
             report: { include: { sales: true } },
-            event: { select: { milesFromHq: true } },
+            event: { select: { milesFromHq: true, driveTimeMins: true, setupTimeMins: true } },
           },
         },
       },
@@ -45,7 +68,10 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const completedShifts = amb.shifts;
 
       const hoursWorked = completedShifts.reduce((s, sh) => s + (sh.payment?.hoursWorked || 0), 0);
-      const hourlyPay = Math.round(hoursWorked * 20 * 100) / 100;
+      const hourlyPay = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
+
+      const driveTimeHours = completedShifts.reduce((s, sh) => s + ((sh.event?.driveTimeMins || 0) * 2) / 60, 0);
+      const setupTimeHours = completedShifts.reduce((s, sh) => s + (sh.event?.setupTimeMins || 0) / 60, 0);
 
       const milesDriven = completedShifts.reduce((s, sh) => s + (sh.event?.milesFromHq || 0) * 2, 0); // round trip
       const mileageReimbursement = Math.round(milesDriven * MILEAGE_RATE * 100) / 100;
@@ -66,6 +92,8 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
         lifetimeSalesCount: amb.lifetimeSalesCount,
         hoursWorked: Math.round(hoursWorked * 100) / 100,
         hourlyPay,
+        driveTimeHours: Math.round(driveTimeHours * 100) / 100,
+        setupTimeHours: Math.round(setupTimeHours * 100) / 100,
         milesDriven: Math.round(milesDriven * 10) / 10,
         mileageReimbursement,
         salesThisPeriod,
@@ -172,7 +200,7 @@ router.get('/', verifyToken, async (req, res) => {
         },
         orderBy: { createdAt: 'desc' },
       });
-      return res.json(payments);
+      return res.json(payments.map(withBreakdown));
     }
 
     const where = { ambassadorId: req.user.id };
@@ -182,7 +210,28 @@ router.get('/', verifyToken, async (req, res) => {
       include: { shift: { include: { event: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(payments);
+    res.json(payments.map(withBreakdown));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/payments/bulk-status — admin only, approve/mark-paid multiple payments at once
+router.put('/bulk-status', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids (non-empty array) is required' });
+    }
+    if (!['PENDING', 'APPROVED', 'PAID'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be PENDING, APPROVED, or PAID' });
+    }
+    const result = await prisma.payment.updateMany({
+      where: { id: { in: ids } },
+      data: { status },
+    });
+    res.json({ updated: result.count });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

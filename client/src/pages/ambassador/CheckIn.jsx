@@ -149,6 +149,13 @@ export default function CheckIn() {
           {isCheckedIn && targetShift?.checkinTime && (
             <div className="text-green-600 font-medium">Checked in at {formatDateTime(targetShift.checkinTime)}</div>
           )}
+          {(targetShift?.event.milesFromHq != null || targetShift?.event.driveTimeMins != null) && (
+            <div className="text-slate-400">
+              Round-trip: {((targetShift.event.milesFromHq || 0) * 2).toFixed(1)} mi
+              {targetShift.event.driveTimeMins != null && `, ${targetShift.event.driveTimeMins * 2} min drive`}
+              {targetShift.event.setupTimeMins ? ` + ${targetShift.event.setupTimeMins} min setup` : ''} — included in your pay
+            </div>
+          )}
         </div>
       </Card>
 

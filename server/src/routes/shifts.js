@@ -5,10 +5,10 @@ const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
-const { sendShiftAssignedEmail, sendShiftPickupEmail } = require('../services/emailService');
+const { sendShiftAssignedEmail, sendShiftPickupEmail, sendCheckInNotificationEmail, sendCheckoutNotificationEmail } = require('../services/emailService');
 const { geocodeAddress, haversineDistance } = require('../lib/geo');
 const { withShiftArrivalTime } = require('../lib/time');
-const { MIN_PAID_HOURS, CHECKIN_RADIUS_FEET, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
+const { MIN_PAID_HOURS, HOURLY_RATE, CHECKIN_RADIUS_FEET, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -247,6 +247,22 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
         locationOverride: !withinRadius,
       },
     });
+
+    prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+      .then(async (admins) => {
+        const adminEmails = admins.map((u) => u.email);
+        if (adminEmails.length === 0) return;
+        const ambassador = await prisma.user.findUnique({
+          where: { id: shift.ambassadorId },
+          select: { firstName: true, lastName: true, email: true },
+        });
+        if (ambassador) {
+          sendCheckInNotificationEmail(adminEmails, ambassador, shift.event).catch((err) =>
+            console.error('[CHECKIN EMAIL]', err));
+        }
+      })
+      .catch((err) => console.error('[CHECKIN NOTIFY]', err));
+
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -268,8 +284,9 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     const checkoutTime = new Date();
     const onSiteHours = (checkoutTime - shift.checkinTime) / 3600000;
     const roundTripDriveHours = ((shift.event.driveTimeMins || 0) * 2) / 60;
-    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours) * 100) / 100;
-    const amount = Math.round(hoursWorked * 20 * 100) / 100;
+    const setupHours = (shift.event.setupTimeMins || 0) / 60;
+    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours + setupHours) * 100) / 100;
+    const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
     const updated = await prisma.shift.update({
       where: { id: req.params.id },
@@ -288,6 +305,21 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
         },
       });
     }
+
+    prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+      .then(async (admins) => {
+        const adminEmails = admins.map((u) => u.email);
+        if (adminEmails.length === 0) return;
+        const ambassador = await prisma.user.findUnique({
+          where: { id: shift.ambassadorId },
+          select: { firstName: true, lastName: true, email: true },
+        });
+        if (ambassador) {
+          sendCheckoutNotificationEmail(adminEmails, ambassador, shift.event, hoursWorked, amount).catch((err) =>
+            console.error('[CHECKOUT EMAIL]', err));
+        }
+      })
+      .catch((err) => console.error('[CHECKOUT NOTIFY]', err));
 
     res.json(updated);
   } catch (err) {

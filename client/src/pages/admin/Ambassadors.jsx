@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { usersAPI, shiftsAPI } from '../../api/index.js';
 import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours } from '../../utils/formatters.js';
-import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2, CalendarClock } from 'lucide-react';
 
 function AddAmbassadorModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '', lifetimeSalesCount: 0 });
@@ -234,9 +235,16 @@ export default function AdminAmbassadors() {
                   <span>Joined {new Date(amb.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                 </div>
 
+                <Link
+                  to={`/admin/availability?ambassadorId=${amb.id}`}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-mint-600 hover:bg-mint-50 rounded-lg py-1.5 transition"
+                >
+                  <CalendarClock size={13} /> View Availability
+                </Link>
+
                 <button
                   onClick={() => setConfirmDelete(amb)}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
+                  className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
                 >
                   <Trash2 size={13} /> Remove Ambassador
                 </button>

@@ -127,7 +127,8 @@ export default function AdminEvents() {
   const [error, setError] = useState('');
   const [ambassadors, setAmbassadors] = useState([]);
   const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
-  const [manualDistance, setManualDistance] = useState(null); // { milesFromHq, driveTimeMins } | null — shown when auto geocoding fails
+  const [distanceOverride, setDistanceOverride] = useState({ milesFromHq: '', driveTimeMins: '' }); // editable mileage/drive-time reimbursement inputs; blank = auto-calculate from address
+  const [geocodeFailed, setGeocodeFailed] = useState(false);
 
   const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
 
@@ -137,7 +138,8 @@ export default function AdminEvents() {
     setEditingEvent(null);
     setForm(EMPTY_FORM);
     setError('');
-    setManualDistance(null);
+    setDistanceOverride({ milesFromHq: '', driveTimeMins: '' });
+    setGeocodeFailed(false);
     setAssignMode('open');
     setModalOpen(true);
     usersAPI.list('AMBASSADOR').then(setAmbassadors).catch(() => {});
@@ -163,7 +165,8 @@ export default function AdminEvents() {
       notes: event.notes || '',
     });
     setError('');
-    setManualDistance(null);
+    setDistanceOverride({ milesFromHq: event.milesFromHq ?? '', driveTimeMins: event.driveTimeMins ?? '' });
+    setGeocodeFailed(false);
     setModalOpen(true);
   };
 
@@ -172,8 +175,10 @@ export default function AdminEvents() {
       setError('Title, location, and start date are required');
       return;
     }
-    if (manualDistance && (manualDistance.milesFromHq === '' || manualDistance.driveTimeMins === '')) {
-      setError('Enter both miles and drive time, or fix the address so it can be calculated automatically');
+    const hasMiles = distanceOverride.milesFromHq !== '';
+    const hasDrive = distanceOverride.driveTimeMins !== '';
+    if (hasMiles !== hasDrive) {
+      setError('Enter both miles and drive time, or leave both blank to auto-calculate from the address');
       return;
     }
     setSaving(true);
@@ -184,9 +189,9 @@ export default function AdminEvents() {
         date: combineDatetime(form.startDate, form.startTime),
         endTime: form.endDate ? combineDatetime(form.endDate, form.endTime) : null,
       };
-      if (manualDistance) {
-        payload.milesFromHq = manualDistance.milesFromHq;
-        payload.driveTimeMins = manualDistance.driveTimeMins;
+      if (hasMiles && hasDrive) {
+        payload.milesFromHq = distanceOverride.milesFromHq;
+        payload.driveTimeMins = distanceOverride.driveTimeMins;
       }
       if (editingEvent) {
         await eventsAPI.update(editingEvent.id, payload);
@@ -198,7 +203,7 @@ export default function AdminEvents() {
       load();
     } catch (err) {
       setError(err.message);
-      if (err.geocodeFailed) setManualDistance({ milesFromHq: '', driveTimeMins: '' });
+      if (err.geocodeFailed) setGeocodeFailed(true);
     } finally {
       setSaving(false);
     }
@@ -305,35 +310,35 @@ export default function AdminEvents() {
 
           <LocationAutocomplete
             value={form.location}
-            onChange={(val) => { set('location')(val); setManualDistance(null); setError(''); }}
+            onChange={(val) => { set('location')(val); setDistanceOverride({ milesFromHq: '', driveTimeMins: '' }); setGeocodeFailed(false); setError(''); }}
           />
 
-          {manualDistance && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-3">
-              <p className="text-xs text-orange-700">
-                We couldn't automatically calculate the drive distance for this address. Look it up in Google Maps and enter it manually.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  label="Miles from HQ"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={manualDistance.milesFromHq}
-                  onChange={(e) => setManualDistance((prev) => ({ ...prev, milesFromHq: e.target.value }))}
-                  placeholder="0.0"
-                />
-                <Input
-                  label="Drive Time (mins)"
-                  type="number"
-                  min="0"
-                  value={manualDistance.driveTimeMins}
-                  onChange={(e) => setManualDistance((prev) => ({ ...prev, driveTimeMins: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
+          <div className={`rounded-lg p-3 space-y-3 border ${geocodeFailed ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+            <p className={`text-xs ${geocodeFailed ? 'text-orange-700' : 'text-slate-500'}`}>
+              {geocodeFailed
+                ? "We couldn't automatically calculate the drive distance for this address. Look it up in Google Maps and enter it manually."
+                : 'Miles and drive time from HQ are auto-calculated from the address, factored into mileage reimbursement and paid hours. Override them here if needed.'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Miles from HQ"
+                type="number"
+                min="0"
+                step="0.1"
+                value={distanceOverride.milesFromHq}
+                onChange={(e) => setDistanceOverride((prev) => ({ ...prev, milesFromHq: e.target.value }))}
+                placeholder="Auto"
+              />
+              <Input
+                label="Drive Time (mins)"
+                type="number"
+                min="0"
+                value={distanceOverride.driveTimeMins}
+                onChange={(e) => setDistanceOverride((prev) => ({ ...prev, driveTimeMins: e.target.value }))}
+                placeholder="Auto"
+              />
             </div>
-          )}
+          </div>
 
           <div className="space-y-3">
             <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Start</p>
@@ -367,7 +372,7 @@ export default function AdminEvents() {
           </div>
 
           <div className="bg-mint-50 rounded-lg px-3 py-2 text-xs text-slate-600">
-            💰 Pay rate: <strong>$20/hr</strong> (fixed)
+            💰 Pay rate: <strong>$20/hr</strong> (fixed) — applied to event time, round-trip drive time, and setup time
           </div>
 
           <div className="border-t border-slate-100 pt-4">

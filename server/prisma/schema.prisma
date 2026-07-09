@@ -35,6 +35,12 @@ enum PaymentStatus {
   PAID
 }
 
+enum AvailabilityStatus {
+  OPEN
+  UNAVAILABLE
+  OTHER
+}
+
 model User {
   id                 String  @id @default(cuid())
   email              String  @unique
@@ -61,6 +67,7 @@ model User {
   sentMessages     Message[]
   payments         Payment[]
   leaderboardEntry LeaderboardEntry[]
+  availabilityDays AvailabilityDay[]
 }
 
 model Event {
@@ -166,6 +173,21 @@ model Message {
 
   event  Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   sender User  @relation(fields: [senderId], references: [id])
+}
+
+model AvailabilityDay {
+  id     String              @id @default(cuid())
+  userId String
+  date   DateTime            @db.Date
+  status AvailabilityStatus  @default(OPEN)
+  note   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }
 
 model LeaderboardEntry {

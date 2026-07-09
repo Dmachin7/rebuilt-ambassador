@@ -27,6 +27,8 @@ import CheckIn from './pages/ambassador/CheckIn.jsx';
 import ReportForm from './pages/ambassador/Report.jsx';
 import Earnings from './pages/ambassador/Earnings.jsx';
 import AmbassadorLeaderboard from './pages/ambassador/Leaderboard.jsx';
+import AmbassadorAvailability from './pages/ambassador/Availability.jsx';
+import AdminAvailability from './pages/admin/Availability.jsx';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
@@ -79,6 +81,7 @@ export default function App() {
             <Route path="events/:id" element={<EventDetail />} />
             <Route path="calendar" element={<AdminCalendar />} />
             <Route path="ambassadors" element={<AdminAmbassadors />} />
+            <Route path="availability" element={<AdminAvailability />} />
             {/* Payroll, Reports, and Staff — Admin only */}
             <Route path="reports" element={<AdminOnlyRoute><AdminReports /></AdminOnlyRoute>} />
             <Route path="payroll" element={<AdminOnlyRoute><AdminPayroll /></AdminOnlyRoute>} />
@@ -105,6 +108,7 @@ export default function App() {
             <Route path="report" element={<ReportForm />} />
             <Route path="earnings" element={<Earnings />} />
             <Route path="leaderboard" element={<AmbassadorLeaderboard />} />
+            <Route path="availability" element={<AmbassadorAvailability />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

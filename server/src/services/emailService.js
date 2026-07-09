@@ -238,6 +238,52 @@ async function sendSalesVerificationEmail(staffEmails, event, ambassador, report
   });
 }
 
+async function sendCheckInNotificationEmail(adminEmails, ambassador, event) {
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">✅ Checked In: ${event.title}</h2>
+      <p style="color:#555"><strong>${ambassador.firstName} ${ambassador.lastName}</strong> just checked in for this event.</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
+        <p style="margin:6px 0;color:#333"><strong>Ambassador:</strong> ${ambassador.firstName} ${ambassador.lastName} · ${ambassador.email}</p>
+        <p style="margin:6px 0;color:#333"><strong>Checked in at:</strong> ${fmtTime(new Date())}</p>
+      </div>
+      <p style="color:#555">View this event in the <a href="${process.env.FRONTEND_URL}/admin/events" style="color:#2d6a4f">event dashboard</a>.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Platform</p>
+    </div>
+  `;
+  await send({
+    to: adminEmails,
+    subject: `Checked In: ${ambassador.firstName} ${ambassador.lastName} — ${event.title}`,
+    html,
+  });
+}
+
+async function sendCheckoutNotificationEmail(adminEmails, ambassador, event, hoursWorked, amount) {
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">🏁 Checked Out: ${event.title}</h2>
+      <p style="color:#555"><strong>${ambassador.firstName} ${ambassador.lastName}</strong> just checked out of this event.</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        <p style="margin:6px 0;color:#333"><strong>Ambassador:</strong> ${ambassador.firstName} ${ambassador.lastName} · ${ambassador.email}</p>
+        <p style="margin:6px 0;color:#333"><strong>Hours worked (incl. drive + setup time):</strong> ${hoursWorked.toFixed(2)}</p>
+        <p style="margin:6px 0;color:#333"><strong>Pay:</strong> $${amount.toFixed(2)}</p>
+      </div>
+      <p style="color:#555">Review and approve this shift's pay in the <a href="${process.env.FRONTEND_URL}/admin/payroll" style="color:#2d6a4f">payroll dashboard</a>.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Platform</p>
+    </div>
+  `;
+  await send({
+    to: adminEmails,
+    subject: `Checked Out: ${ambassador.firstName} ${ambassador.lastName} — ${event.title}`,
+    html,
+  });
+}
+
 async function sendNewOpenEventEmail(ambassadorEmails, event, openShifts) {
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
@@ -296,4 +342,6 @@ module.exports = {
   sendNewOpenEventEmail,
   sendMessageNotificationEmail,
   sendSalesVerificationEmail,
+  sendCheckInNotificationEmail,
+  sendCheckoutNotificationEmail,
 };

@@ -175,9 +175,11 @@ function PayrollRecords() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState([]); // payment ids
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const load = () => paymentsAPI.list(filter || undefined).then(setPayments).finally(() => setLoading(false));
-  useEffect(() => { setLoading(true); load(); }, [filter]);
+  useEffect(() => { setLoading(true); setSelected([]); load(); }, [filter]);
 
   const handleStatus = async (id, newStatus) => {
     setUpdating(id);
@@ -189,6 +191,28 @@ function PayrollRecords() {
     } finally {
       setUpdating(null);
     }
+  };
+
+  const handleBulkStatus = async (newStatus) => {
+    if (selected.length === 0) return;
+    setBulkUpdating(true);
+    try {
+      await paymentsAPI.bulkUpdateStatus(selected, newStatus);
+      setSelected([]);
+      load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const toggleSelected = (id) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.length === payments.length ? [] : payments.map((p) => p.id)));
   };
 
   const handleExport = async () => {
@@ -216,6 +240,23 @@ function PayrollRecords() {
           <Download size={16} /> {exporting ? 'Exporting...' : 'Export CSV'}
         </Button>
       </div>
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 bg-mint-50 border border-mint-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm text-mint-800 font-medium">{selected.length} selected</span>
+          <div className="flex gap-2 ml-auto">
+            <Button size="sm" onClick={() => handleBulkStatus('APPROVED')} disabled={bulkUpdating}>
+              {bulkUpdating ? 'Updating...' : 'Approve Selected'}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleBulkStatus('PAID')} disabled={bulkUpdating}>
+              Mark Paid
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected([])} disabled={bulkUpdating}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <Card className="p-4 text-center">
@@ -251,10 +292,19 @@ function PayrollRecords() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
                 <tr>
+                  <th className="px-4 py-3 text-left w-8">
+                    <input
+                      type="checkbox"
+                      checked={payments.length > 0 && selected.length === payments.length}
+                      onChange={toggleSelectAll}
+                      className="accent-mint-600"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left">Ambassador</th>
                   <th className="px-4 py-3 text-left">Event</th>
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-right">Hours</th>
+                  <th className="px-4 py-3 text-right">Mileage</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Action</th>
@@ -262,14 +312,37 @@ function PayrollRecords() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.id} className={`hover:bg-slate-50 ${selected.includes(p.id) ? 'bg-mint-50/50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(p.id)}
+                        onChange={() => toggleSelected(p.id)}
+                        className="accent-mint-600"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-700">{p.ambassador.firstName} {p.ambassador.lastName}</div>
                       <div className="text-xs text-slate-400">{p.ambassador.email}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{p.shift.event.title}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(p.shift.event.date)}</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{formatHours(p.hoursWorked)}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">
+                      {formatHours(p.hoursWorked)}
+                      {p.breakdown && (
+                        <div className="text-xs text-slate-400 font-normal">
+                          {p.breakdown.onSiteHours != null ? `${p.breakdown.onSiteHours.toFixed(1)}h on-site` : ''}
+                          {p.breakdown.driveTimeHours > 0 ? ` + ${p.breakdown.driveTimeHours.toFixed(1)}h drive` : ''}
+                          {p.breakdown.setupTimeHours > 0 ? ` + ${p.breakdown.setupTimeHours.toFixed(1)}h setup` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-600">
+                      {p.breakdown ? `${p.breakdown.miles.toFixed(1)} mi` : '—'}
+                      {p.breakdown?.mileageReimbursement > 0 && (
+                        <div className="text-xs text-slate-400 font-normal">{formatCurrency(p.breakdown.mileageReimbursement)}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(p.amount)}</td>
                     <td className="px-4 py-3 text-center"><Badge status={p.status} /></td>
                     <td className="px-4 py-3 text-center">

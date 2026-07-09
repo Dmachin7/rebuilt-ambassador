@@ -97,17 +97,18 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Notify staff to verify sales against Shopify before commission is paid
-    if (report.sales.length > 0) {
-      const [ambassador, staff] = await Promise.all([
+    // Notify admins that a report was submitted — also serves as the sales-verification prompt
+    // when the report includes sales (verification is required before commission is payable).
+    {
+      const [ambassador, admins] = await Promise.all([
         shift.ambassadorId
           ? prisma.user.findUnique({ where: { id: shift.ambassadorId }, select: { firstName: true, lastName: true } })
           : null,
-        prisma.user.findMany({ where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } }, select: { email: true } }),
+        prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } }),
       ]);
-      const staffEmails = staff.map((u) => u.email);
-      if (staffEmails.length > 0) {
-        sendSalesVerificationEmail(staffEmails, shift.event, ambassador, report).catch((err) =>
+      const adminEmails = admins.map((u) => u.email);
+      if (adminEmails.length > 0) {
+        sendSalesVerificationEmail(adminEmails, shift.event, ambassador, report).catch((err) =>
           console.error('[SALES VERIFY EMAIL]', err)
         );
       }

@@ -40,6 +40,7 @@ export const reportsAPI = {
 export const paymentsAPI = {
   list: (status) => api.get(`/payments${status ? `?status=${status}` : ''}`),
   updateStatus: (id, status) => api.put(`/payments/${id}/status`, { status }),
+  bulkUpdateStatus: (ids, status) => api.put('/payments/bulk-status', { ids, status }),
   exportCsv: () => api.downloadCsv('/payments/export/csv'),
   biweekly: (start, end) => {
     const params = [];
@@ -87,4 +88,16 @@ export const usersAPI = {
 export const notificationsAPI = {
   triggerDaily: () => api.post('/notifications/daily'),
   triggerWeekly: () => api.post('/notifications/weekly'),
+};
+
+// Availability
+export const availabilityAPI = {
+  get: (userId, start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.get(`/availability/${userId}${params.length ? `?${params.join('&')}` : ''}`);
+  },
+  setMine: (days) => api.put('/availability', { days }),
+  setFor: (userId, days) => api.put(`/availability/${userId}`, { days }),
 };

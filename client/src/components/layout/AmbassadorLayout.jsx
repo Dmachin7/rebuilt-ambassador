@@ -1,14 +1,15 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { CalendarDays, CheckSquare, FileText, DollarSign, Trophy, LogOut } from 'lucide-react';
+import { CalendarDays, CheckSquare, FileText, DollarSign, Trophy, LogOut, CalendarClock } from 'lucide-react';
 
 const bottomNav = [
-  { to: '/shifts',      icon: CalendarDays, label: 'Shifts' },
-  { to: '/checkin',     icon: CheckSquare,  label: 'Check-In' },
-  { to: '/report',      icon: FileText,     label: 'Report' },
-  { to: '/earnings',    icon: DollarSign,   label: 'Earnings' },
-  { to: '/leaderboard', icon: Trophy,       label: 'Rankings' },
+  { to: '/shifts',       icon: CalendarDays,  label: 'Shifts' },
+  { to: '/checkin',      icon: CheckSquare,   label: 'Check-In' },
+  { to: '/report',       icon: FileText,      label: 'Report' },
+  { to: '/availability', icon: CalendarClock, label: 'Availability' },
+  { to: '/earnings',     icon: DollarSign,    label: 'Earnings' },
+  { to: '/leaderboard',  icon: Trophy,        label: 'Rankings' },
 ];
 
 export default function AmbassadorLayout() {

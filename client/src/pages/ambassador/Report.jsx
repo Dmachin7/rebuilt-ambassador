@@ -127,6 +127,13 @@ export default function ReportForm() {
           <Card className="p-3 bg-mint-50 border-mint-200">
             <p className="text-sm font-medium text-mint-700">{selectedShift.event.title}</p>
             <p className="text-xs text-slate-500">{formatShortDate(selectedShift.event.date)}</p>
+            {(selectedShift.event.milesFromHq != null || selectedShift.event.driveTimeMins != null) && (
+              <p className="text-xs text-slate-500 mt-1">
+                Round-trip: {((selectedShift.event.milesFromHq || 0) * 2).toFixed(1)} mi
+                {selectedShift.event.driveTimeMins != null && `, ${selectedShift.event.driveTimeMins * 2} min drive`}
+                {selectedShift.event.setupTimeMins ? ` + ${selectedShift.event.setupTimeMins} min setup` : ''} — included in your pay
+              </p>
+            )}
           </Card>
         )}
 

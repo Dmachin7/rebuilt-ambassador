@@ -6,107 +6,11 @@ import { Download, Calendar } from 'lucide-react';
 
 const STATUS_OPTIONS = ['PENDING', 'APPROVED', 'PAID'];
 
-// Per-ambassador pay breakdown modal — shows the shift-by-shift line items
-// (drive time, setup time, on-site time, sales/commission) behind a summary row's totals.
-function PayBreakdownModal({ ambassador, periodStart, periodEnd, onClose }) {
-  if (!ambassador) return null;
-  const r = ambassador;
-
-  return (
-    <Modal isOpen={!!ambassador} onClose={onClose} title={`${r.firstName} ${r.lastName} — Pay Breakdown`} size="xl">
-      <div className="space-y-4">
-        <p className="text-xs text-slate-400">
-          Period: {new Date(periodStart).toLocaleDateString()} – {new Date(periodEnd).toLocaleDateString()}
-          {' · '}{r.lifetimeSalesCount} lifetime sales
-        </p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.hourlyPay)}</div>
-            <div className="text-xs text-slate-500 mt-1">Hourly Pay</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.mileageReimbursement)}</div>
-            <div className="text-xs text-slate-500 mt-1">Mileage</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-mint-600">{formatCurrency(r.commissionEarned)}</div>
-            <div className="text-xs text-slate-500 mt-1">Commission</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.totalPayout)}</div>
-            <div className="text-xs text-slate-500 mt-1">Total Payout</div>
-          </Card>
-        </div>
-
-        {(!r.shifts || r.shifts.length === 0) ? (
-          <EmptyState icon="📋" title="No shifts in this period" description="This ambassador had no completed shifts in the selected date range" />
-        ) : (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Event</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-right">On-Site</th>
-                    <th className="px-3 py-2 text-right">Drive</th>
-                    <th className="px-3 py-2 text-right">Setup</th>
-                    <th className="px-3 py-2 text-right">Hours</th>
-                    <th className="px-3 py-2 text-right">Hourly Pay</th>
-                    <th className="px-3 py-2 text-right">Miles</th>
-                    <th className="px-3 py-2 text-right">Mileage</th>
-                    <th className="px-3 py-2 text-right">Sales</th>
-                    <th className="px-3 py-2 text-right">Commission</th>
-                    <th className="px-3 py-2 text-right font-semibold">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {r.shifts.map((sh) => (
-                    <tr key={sh.shiftId} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 text-slate-700">{sh.eventTitle}</td>
-                      <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{sh.eventDate ? formatDate(sh.eventDate) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{sh.onSiteHours != null ? formatHours(sh.onSiteHours) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{formatHours(sh.driveTimeHours)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{formatHours(sh.setupTimeHours)}</td>
-                      <td className="px-3 py-2 text-right font-medium text-slate-700">{formatHours(sh.hoursWorked)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(sh.hourlyPay)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{sh.miles.toFixed(1)} mi</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(sh.mileageReimbursement)}</td>
-                      <td className="px-3 py-2 text-right text-slate-600">{sh.sales}</td>
-                      <td className="px-3 py-2 text-right text-mint-700 font-medium">
-                        {formatCurrency(sh.commissionEarned)}
-                        {sh.pendingSales > 0 && (
-                          <div className="text-xs text-orange-500 font-normal">{sh.pendingSales} pending</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold text-slate-800">{formatCurrency(sh.totalPayout)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
-
-        <p className="text-xs text-slate-400">
-          Commission: $20/sale under $99 · $40/sale $99+ (only once admin-verified in Reports) · Mileage: $0.30/mile (round-trip)
-        </p>
-
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>Close</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // Bi-weekly summary tab
 function BiweeklySummary() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [selectedAmb, setSelectedAmb] = useState(null);
 
   // Default date range: last 14 days
   const defaultEnd = new Date();
@@ -233,13 +137,8 @@ function BiweeklySummary() {
                   {summary.summary.map((r) => (
                     <tr key={r.ambassadorId} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => setSelectedAmb(r)}
-                          className="text-left hover:text-mint-700 cursor-pointer"
-                        >
-                          <div className="font-medium text-slate-700 hover:underline">{r.firstName} {r.lastName}</div>
-                          <div className="text-xs text-slate-400">{r.lifetimeSalesCount} lifetime sales</div>
-                        </button>
+                        <div className="font-medium text-slate-700">{r.firstName} {r.lastName}</div>
+                        <div className="text-xs text-slate-400">{r.lifetimeSalesCount} lifetime sales</div>
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600">{r.shiftCount}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{formatHours(r.hoursWorked)}</td>
@@ -265,14 +164,77 @@ function BiweeklySummary() {
           </p>
         </>
       )}
-
-      <PayBreakdownModal
-        ambassador={selectedAmb}
-        periodStart={summary?.start}
-        periodEnd={summary?.end}
-        onClose={() => setSelectedAmb(null)}
-      />
     </div>
+  );
+}
+
+// Line-item breakdown modal for a single payment record — shows exactly how
+// drive time, on-site time, setup time, mileage, and sales/commission add up.
+function PaymentBreakdownModal({ payment, onClose }) {
+  if (!payment) return null;
+  const p = payment;
+  const b = p.breakdown || {};
+  const totalPayout = Math.round(((p.amount || 0) + (b.mileageReimbursement || 0) + (b.commissionEarned || 0)) * 100) / 100;
+
+  const Line = ({ label, value, bold, accent }) => (
+    <div className={`flex justify-between py-2 text-sm ${bold ? 'font-semibold text-slate-800' : ''}`}>
+      <span className={bold ? '' : 'text-slate-500'}>{label}</span>
+      <span className={accent ? 'text-mint-700 font-medium' : (bold ? '' : 'text-slate-700')}>{value}</span>
+    </div>
+  );
+
+  return (
+    <Modal isOpen={!!payment} onClose={onClose} title={`${p.ambassador.firstName} ${p.ambassador.lastName} — Pay Breakdown`} size="md">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+          <div>
+            <div className="text-sm font-medium text-slate-700">{p.shift.event.title}</div>
+            <div className="text-xs text-slate-400">{formatDate(p.shift.event.date)}</div>
+          </div>
+          <Badge status={p.status} />
+        </div>
+
+        <div className="divide-y divide-slate-50">
+          <Line label="On-Site Time" value={b.onSiteHours != null ? formatHours(b.onSiteHours) : '—'} />
+          <Line label="Drive Time (round-trip)" value={formatHours(b.driveTimeHours)} />
+          <Line label="Setup Time" value={formatHours(b.setupTimeHours)} />
+          <Line label="Total Hours" value={formatHours(p.hoursWorked)} bold />
+          <Line label="Hourly Pay" value={formatCurrency(p.amount)} />
+        </div>
+
+        <div className="divide-y divide-slate-50 pt-2">
+          <Line label="Miles Driven (round-trip)" value={`${(b.miles ?? 0).toFixed(1)} mi`} />
+          <Line label="Mileage Reimbursement" value={formatCurrency(b.mileageReimbursement)} />
+        </div>
+
+        <div className="divide-y divide-slate-50 pt-2">
+          <Line label="Sales This Shift" value={b.sales ?? 0} />
+          <Line
+            label="Commission Earned"
+            value={
+              <>
+                {formatCurrency(b.commissionEarned)}
+                {b.pendingSales > 0 && <span className="text-orange-500 text-xs font-normal ml-1">({b.pendingSales} pending)</span>}
+              </>
+            }
+            accent
+          />
+        </div>
+
+        <div className="flex justify-between pt-3 mt-2 border-t border-slate-200 text-base font-bold text-slate-800">
+          <span>Total Payout</span>
+          <span>{formatCurrency(totalPayout)}</span>
+        </div>
+
+        <p className="text-xs text-slate-400 pt-3">
+          Commission: $20/sale under $99 · $40/sale $99+ (only once admin-verified in Reports) · Mileage: $0.30/mile (round-trip)
+        </p>
+
+        <div className="flex justify-end pt-2">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -285,6 +247,7 @@ function PayrollRecords() {
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState([]); // payment ids
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
 
   const load = () => paymentsAPI.list(filter || undefined).then(setPayments).finally(() => setLoading(false));
   useEffect(() => { setLoading(true); setSelected([]); load(); }, [filter]);
@@ -430,8 +393,13 @@ function PayrollRecords() {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-700">{p.ambassador.firstName} {p.ambassador.lastName}</div>
-                      <div className="text-xs text-slate-400">{p.ambassador.email}</div>
+                      <button
+                        onClick={() => setSelectedPayment(p)}
+                        className="text-left hover:text-mint-700 cursor-pointer"
+                      >
+                        <div className="font-medium text-slate-700 hover:underline">{p.ambassador.firstName} {p.ambassador.lastName}</div>
+                        <div className="text-xs text-slate-400">{p.ambassador.email}</div>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{p.shift.event.title}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(p.shift.event.date)}</td>
@@ -475,6 +443,8 @@ function PayrollRecords() {
       <p className="text-xs text-slate-400">
         * Export includes full 1099 fields + commission + mileage. Encrypt SSN before storing in production.
       </p>
+
+      <PaymentBreakdownModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
     </div>
   );
 }

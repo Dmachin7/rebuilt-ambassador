@@ -4,7 +4,8 @@ const HQ_ADDRESS = process.env.REBUILT_HQ_ADDRESS || '4618 N Hale Ave, Tampa, FL
 // Mileage reimbursement, paid on round-trip miles from HQ
 const MILEAGE_RATE = 0.30;
 
-// Flat hourly pay rate — applied to on-site event time, round-trip drive time, and setup time
+// Flat hourly pay rate — applied to on-site event time (which already covers setup, since
+// ambassadors check in when they arrive to set up) and round-trip drive time
 const HOURLY_RATE = 20;
 
 // Minimum paid hours per shift, inclusive of round-trip drive time

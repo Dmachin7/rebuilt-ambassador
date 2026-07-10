@@ -58,7 +58,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
           include: {
             payment: true,
             report: { include: { sales: true } },
-            event: { select: { milesFromHq: true, driveTimeMins: true, setupTimeMins: true } },
+            event: { select: { title: true, date: true, milesFromHq: true, driveTimeMins: true, setupTimeMins: true } },
           },
         },
       },
@@ -84,6 +84,40 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
 
       const totalPayout = Math.round((hourlyPay + mileageReimbursement + commissionEarned) * 100) / 100;
 
+      // Per-shift line items so the admin can see exactly how each shift's pay was built
+      const shifts = completedShifts.map((sh) => {
+        const shOnSiteHours = sh.checkinTime && sh.checkoutTime
+          ? (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000
+          : null;
+        const shDriveTimeHours = ((sh.event?.driveTimeMins || 0) * 2) / 60;
+        const shSetupTimeHours = (sh.event?.setupTimeMins || 0) / 60;
+        const shHoursWorked = sh.payment?.hoursWorked || 0;
+        const shHourlyPay = Math.round(shHoursWorked * HOURLY_RATE * 100) / 100;
+        const shMiles = (sh.event?.milesFromHq || 0) * 2;
+        const shMileageReimbursement = Math.round(shMiles * MILEAGE_RATE * 100) / 100;
+        const shSales = sh.report?.totalSales || 0;
+        const shCommission = Math.round(verifiedCommission(sh.report?.sales) * 100) / 100;
+        const shPendingSales = pendingSaleCount(sh.report?.sales);
+        const shTotalPayout = Math.round((shHourlyPay + shMileageReimbursement + shCommission) * 100) / 100;
+
+        return {
+          shiftId: sh.id,
+          eventTitle: sh.event?.title || 'Untitled Event',
+          eventDate: sh.event?.date || null,
+          onSiteHours: shOnSiteHours !== null ? Math.round(shOnSiteHours * 100) / 100 : null,
+          driveTimeHours: Math.round(shDriveTimeHours * 100) / 100,
+          setupTimeHours: Math.round(shSetupTimeHours * 100) / 100,
+          hoursWorked: Math.round(shHoursWorked * 100) / 100,
+          hourlyPay: shHourlyPay,
+          miles: Math.round(shMiles * 10) / 10,
+          mileageReimbursement: shMileageReimbursement,
+          sales: shSales,
+          commissionEarned: shCommission,
+          pendingSales: shPendingSales,
+          totalPayout: shTotalPayout,
+        };
+      });
+
       return {
         ambassadorId: amb.id,
         firstName: amb.firstName,
@@ -101,6 +135,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
         pendingSales,
         totalPayout,
         shiftCount: completedShifts.length,
+        shifts,
       };
     });
 

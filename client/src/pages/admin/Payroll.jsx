@@ -1,16 +1,112 @@
 import React, { useEffect, useState } from 'react';
 import { paymentsAPI } from '../../api/index.js';
-import { Card, Button, Badge, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
+import { Card, Button, Badge, Select, Spinner, EmptyState, Modal } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours, formatDate } from '../../utils/formatters.js';
 import { Download, Calendar } from 'lucide-react';
 
 const STATUS_OPTIONS = ['PENDING', 'APPROVED', 'PAID'];
+
+// Per-ambassador pay breakdown modal — shows the shift-by-shift line items
+// (drive time, setup time, on-site time, sales/commission) behind a summary row's totals.
+function PayBreakdownModal({ ambassador, periodStart, periodEnd, onClose }) {
+  if (!ambassador) return null;
+  const r = ambassador;
+
+  return (
+    <Modal isOpen={!!ambassador} onClose={onClose} title={`${r.firstName} ${r.lastName} — Pay Breakdown`} size="xl">
+      <div className="space-y-4">
+        <p className="text-xs text-slate-400">
+          Period: {new Date(periodStart).toLocaleDateString()} – {new Date(periodEnd).toLocaleDateString()}
+          {' · '}{r.lifetimeSalesCount} lifetime sales
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card className="p-3 text-center">
+            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.hourlyPay)}</div>
+            <div className="text-xs text-slate-500 mt-1">Hourly Pay</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.mileageReimbursement)}</div>
+            <div className="text-xs text-slate-500 mt-1">Mileage</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-lg font-bold text-mint-600">{formatCurrency(r.commissionEarned)}</div>
+            <div className="text-xs text-slate-500 mt-1">Commission</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-lg font-bold text-slate-800">{formatCurrency(r.totalPayout)}</div>
+            <div className="text-xs text-slate-500 mt-1">Total Payout</div>
+          </Card>
+        </div>
+
+        {(!r.shifts || r.shifts.length === 0) ? (
+          <EmptyState icon="📋" title="No shifts in this period" description="This ambassador had no completed shifts in the selected date range" />
+        ) : (
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Event</th>
+                    <th className="px-3 py-2 text-left">Date</th>
+                    <th className="px-3 py-2 text-right">On-Site</th>
+                    <th className="px-3 py-2 text-right">Drive</th>
+                    <th className="px-3 py-2 text-right">Setup</th>
+                    <th className="px-3 py-2 text-right">Hours</th>
+                    <th className="px-3 py-2 text-right">Hourly Pay</th>
+                    <th className="px-3 py-2 text-right">Miles</th>
+                    <th className="px-3 py-2 text-right">Mileage</th>
+                    <th className="px-3 py-2 text-right">Sales</th>
+                    <th className="px-3 py-2 text-right">Commission</th>
+                    <th className="px-3 py-2 text-right font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {r.shifts.map((sh) => (
+                    <tr key={sh.shiftId} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 text-slate-700">{sh.eventTitle}</td>
+                      <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{sh.eventDate ? formatDate(sh.eventDate) : '—'}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{sh.onSiteHours != null ? formatHours(sh.onSiteHours) : '—'}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{formatHours(sh.driveTimeHours)}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{formatHours(sh.setupTimeHours)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">{formatHours(sh.hoursWorked)}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(sh.hourlyPay)}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{sh.miles.toFixed(1)} mi</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(sh.mileageReimbursement)}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{sh.sales}</td>
+                      <td className="px-3 py-2 text-right text-mint-700 font-medium">
+                        {formatCurrency(sh.commissionEarned)}
+                        {sh.pendingSales > 0 && (
+                          <div className="text-xs text-orange-500 font-normal">{sh.pendingSales} pending</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-slate-800">{formatCurrency(sh.totalPayout)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        <p className="text-xs text-slate-400">
+          Commission: $20/sale under $99 · $40/sale $99+ (only once admin-verified in Reports) · Mileage: $0.30/mile (round-trip)
+        </p>
+
+        <div className="flex justify-end">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // Bi-weekly summary tab
 function BiweeklySummary() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [selectedAmb, setSelectedAmb] = useState(null);
 
   // Default date range: last 14 days
   const defaultEnd = new Date();
@@ -137,8 +233,13 @@ function BiweeklySummary() {
                   {summary.summary.map((r) => (
                     <tr key={r.ambassadorId} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-700">{r.firstName} {r.lastName}</div>
-                        <div className="text-xs text-slate-400">{r.lifetimeSalesCount} lifetime sales</div>
+                        <button
+                          onClick={() => setSelectedAmb(r)}
+                          className="text-left hover:text-mint-700 cursor-pointer"
+                        >
+                          <div className="font-medium text-slate-700 hover:underline">{r.firstName} {r.lastName}</div>
+                          <div className="text-xs text-slate-400">{r.lifetimeSalesCount} lifetime sales</div>
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600">{r.shiftCount}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{formatHours(r.hoursWorked)}</td>
@@ -164,6 +265,13 @@ function BiweeklySummary() {
           </p>
         </>
       )}
+
+      <PayBreakdownModal
+        ambassador={selectedAmb}
+        periodStart={summary?.start}
+        periodEnd={summary?.end}
+        onClose={() => setSelectedAmb(null)}
+      />
     </div>
   );
 }

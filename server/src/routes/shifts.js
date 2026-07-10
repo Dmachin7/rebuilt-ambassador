@@ -281,11 +281,12 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     if (!shift.checkinTime) return res.status(400).json({ error: 'Must check in first' });
     if (shift.checkoutTime) return res.status(400).json({ error: 'Already checked out' });
 
+    // On-site hours already covers setup time — ambassadors check in when they arrive to
+    // set up, not when selling starts — so setup is not added on top here.
     const checkoutTime = new Date();
     const onSiteHours = (checkoutTime - shift.checkinTime) / 3600000;
     const roundTripDriveHours = ((shift.event.driveTimeMins || 0) * 2) / 60;
-    const setupHours = (shift.event.setupTimeMins || 0) / 60;
-    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours + setupHours) * 100) / 100;
+    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours) * 100) / 100;
     const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
     const updated = await prisma.shift.update({

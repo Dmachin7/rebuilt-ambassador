@@ -40,6 +40,7 @@ export const reportsAPI = {
 export const paymentsAPI = {
   list: (status) => api.get(`/payments${status ? `?status=${status}` : ''}`),
   updateStatus: (id, status) => api.put(`/payments/${id}/status`, { status }),
+  updateBreakdown: (id, breakdown) => api.put(`/payments/${id}/breakdown`, breakdown),
   bulkUpdateStatus: (ids, status) => api.put('/payments/bulk-status', { ids, status }),
   exportCsv: () => api.downloadCsv('/payments/export/csv'),
   biweekly: (start, end) => {

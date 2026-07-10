@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { paymentsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Select, Spinner, EmptyState, Modal } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours, formatDate } from '../../utils/formatters.js';
-import { Download, Calendar } from 'lucide-react';
+import { Download, Calendar, Pencil } from 'lucide-react';
 
 const STATUS_OPTIONS = ['PENDING', 'APPROVED', 'PAID'];
 
@@ -169,17 +169,79 @@ function BiweeklySummary() {
 }
 
 // Line-item breakdown modal for a single payment record — shows exactly how
-// drive time, on-site time, setup time, mileage, and sales/commission add up.
-function PaymentBreakdownModal({ payment, onClose }) {
-  if (!payment) return null;
+// drive time, on-site + setup time, mileage, and sales/commission add up.
+// Admins can flip into an edit mode to correct any line item if something
+// was checked in/out, verified, or entered incorrectly.
+function PaymentBreakdownModal({ payment, onClose, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (payment) {
+      const b = payment.breakdown || {};
+      setForm({
+        onSiteHours: b.onSiteHours ?? 0,
+        driveTimeHours: b.driveTimeHours ?? 0,
+        miles: b.miles ?? 0,
+        sales: b.sales ?? 0,
+        commissionEarned: b.commissionEarned ?? 0,
+      });
+      setEditing(false);
+      setError('');
+    }
+  }, [payment]);
+
+  if (!payment || !form) return null;
   const p = payment;
   const b = p.breakdown || {};
   const totalPayout = Math.round(((p.amount || 0) + (b.mileageReimbursement || 0) + (b.commissionEarned || 0)) * 100) / 100;
 
-  const Line = ({ label, value, bold, accent }) => (
-    <div className={`flex justify-between py-2 text-sm ${bold ? 'font-semibold text-slate-800' : ''}`}>
+  const setField = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await paymentsAPI.updateBreakdown(p.id, {
+        onSiteHours: Number(form.onSiteHours) || 0,
+        driveTimeHours: Number(form.driveTimeHours) || 0,
+        miles: Number(form.miles) || 0,
+        sales: Math.round(Number(form.sales)) || 0,
+        commissionEarned: Number(form.commissionEarned) || 0,
+      });
+      onSaved(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const NumberField = ({ field, step = '0.1', suffix }) => (
+    <div className="flex items-center gap-1 justify-end">
+      <input
+        type="number"
+        min="0"
+        step={step}
+        value={form[field]}
+        onChange={setField(field)}
+        className="w-20 text-right text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-mint-300"
+      />
+      {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
+    </div>
+  );
+
+  const Line = ({ label, value, editField, editStep, editSuffix, bold, accent }) => (
+    <div className={`flex justify-between items-center py-2 text-sm ${bold ? 'font-semibold text-slate-800' : ''}`}>
       <span className={bold ? '' : 'text-slate-500'}>{label}</span>
-      <span className={accent ? 'text-mint-700 font-medium' : (bold ? '' : 'text-slate-700')}>{value}</span>
+      {editing && editField ? (
+        <NumberField field={editField} step={editStep} suffix={editSuffix} />
+      ) : (
+        <span className={accent ? 'text-mint-700 font-medium' : (bold ? '' : 'text-slate-700')}>{value}</span>
+      )}
     </div>
   );
 
@@ -191,24 +253,34 @@ function PaymentBreakdownModal({ payment, onClose }) {
             <div className="text-sm font-medium text-slate-700">{p.shift.event.title}</div>
             <div className="text-xs text-slate-400">{formatDate(p.shift.event.date)}</div>
           </div>
-          <Badge status={p.status} />
+          <div className="flex items-center gap-2">
+            {b.isEdited && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                Edited
+              </span>
+            )}
+            <Badge status={p.status} />
+          </div>
         </div>
 
         <div className="divide-y divide-slate-50">
-          <Line label="On-Site Time" value={b.onSiteHours != null ? formatHours(b.onSiteHours) : '—'} />
-          <Line label="Drive Time (round-trip)" value={formatHours(b.driveTimeHours)} />
-          <Line label="Setup Time" value={formatHours(b.setupTimeHours)} />
+          <Line
+            label="On-Site Time + Setup Time"
+            value={b.onSiteHours != null ? formatHours(b.onSiteHours) : '—'}
+            editField="onSiteHours" editSuffix="hrs"
+          />
+          <Line label="Drive Time (round-trip)" value={formatHours(b.driveTimeHours)} editField="driveTimeHours" editSuffix="hrs" />
           <Line label="Total Hours" value={formatHours(p.hoursWorked)} bold />
           <Line label="Hourly Pay" value={formatCurrency(p.amount)} />
         </div>
 
         <div className="divide-y divide-slate-50 pt-2">
-          <Line label="Miles Driven (round-trip)" value={`${(b.miles ?? 0).toFixed(1)} mi`} />
+          <Line label="Miles Driven (round-trip)" value={`${(b.miles ?? 0).toFixed(1)} mi`} editField="miles" editStep="1" editSuffix="mi" />
           <Line label="Mileage Reimbursement" value={formatCurrency(b.mileageReimbursement)} />
         </div>
 
         <div className="divide-y divide-slate-50 pt-2">
-          <Line label="Sales This Shift" value={b.sales ?? 0} />
+          <Line label="Sales This Shift" value={b.sales ?? 0} editField="sales" editStep="1" />
           <Line
             label="Commission Earned"
             value={
@@ -217,21 +289,42 @@ function PaymentBreakdownModal({ payment, onClose }) {
                 {b.pendingSales > 0 && <span className="text-orange-500 text-xs font-normal ml-1">({b.pendingSales} pending)</span>}
               </>
             }
+            editField="commissionEarned" editStep="0.01" editSuffix="$"
             accent
           />
         </div>
 
         <div className="flex justify-between pt-3 mt-2 border-t border-slate-200 text-base font-bold text-slate-800">
           <span>Total Payout</span>
-          <span>{formatCurrency(totalPayout)}</span>
+          <span>{editing ? '—' : formatCurrency(totalPayout)}</span>
         </div>
+
+        {editing && (
+          <p className="text-xs text-slate-400 pt-1">
+            Hourly pay and mileage reimbursement recalculate automatically from the hours/miles above after you save.
+          </p>
+        )}
+
+        {error && <p className="text-xs text-red-500 pt-2">{error}</p>}
 
         <p className="text-xs text-slate-400 pt-3">
           Commission: $20/sale under $99 · $40/sale $99+ (only once admin-verified in Reports) · Mileage: $0.30/mile (round-trip)
         </p>
 
-        <div className="flex justify-end pt-2">
-          <Button variant="secondary" onClick={onClose}>Close</Button>
+        <div className="flex justify-end gap-2 pt-2">
+          {editing ? (
+            <>
+              <Button variant="secondary" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
+              <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={onClose}>Close</Button>
+              <Button onClick={() => setEditing(true)}>
+                <Pencil size={14} /> Edit
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </Modal>
@@ -295,6 +388,11 @@ function PayrollRecords() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleBreakdownSaved = (updated) => {
+    setPayments((prev) => prev.map((pp) => (pp.id === updated.id ? updated : pp)));
+    setSelectedPayment(updated);
   };
 
   const totalPending = payments.filter((p) => p.status === 'PENDING').reduce((s, p) => s + p.amount, 0);
@@ -383,8 +481,12 @@ function PayrollRecords() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {payments.map((p) => (
-                  <tr key={p.id} className={`hover:bg-slate-50 ${selected.includes(p.id) ? 'bg-mint-50/50' : ''}`}>
-                    <td className="px-4 py-3">
+                  <tr
+                    key={p.id}
+                    onClick={() => setSelectedPayment(p)}
+                    className={`hover:bg-slate-50 cursor-pointer ${selected.includes(p.id) ? 'bg-mint-50/50' : ''}`}
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.includes(p.id)}
@@ -393,13 +495,8 @@ function PayrollRecords() {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedPayment(p)}
-                        className="text-left hover:text-mint-700 cursor-pointer"
-                      >
-                        <div className="font-medium text-slate-700 hover:underline">{p.ambassador.firstName} {p.ambassador.lastName}</div>
-                        <div className="text-xs text-slate-400">{p.ambassador.email}</div>
-                      </button>
+                      <div className="font-medium text-slate-700">{p.ambassador.firstName} {p.ambassador.lastName}</div>
+                      <div className="text-xs text-slate-400">{p.ambassador.email}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{p.shift.event.title}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(p.shift.event.date)}</td>
@@ -407,9 +504,8 @@ function PayrollRecords() {
                       {formatHours(p.hoursWorked)}
                       {p.breakdown && (
                         <div className="text-xs text-slate-400 font-normal">
-                          {p.breakdown.onSiteHours != null ? `${p.breakdown.onSiteHours.toFixed(1)}h on-site` : ''}
+                          {p.breakdown.onSiteHours != null ? `${p.breakdown.onSiteHours.toFixed(1)}h on-site + setup` : ''}
                           {p.breakdown.driveTimeHours > 0 ? ` + ${p.breakdown.driveTimeHours.toFixed(1)}h drive` : ''}
-                          {p.breakdown.setupTimeHours > 0 ? ` + ${p.breakdown.setupTimeHours.toFixed(1)}h setup` : ''}
                         </div>
                       )}
                     </td>
@@ -421,7 +517,7 @@ function PayrollRecords() {
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(p.amount)}</td>
                     <td className="px-4 py-3 text-center"><Badge status={p.status} /></td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={p.status}
                         onChange={(e) => handleStatus(p.id, e.target.value)}
@@ -444,7 +540,11 @@ function PayrollRecords() {
         * Export includes full 1099 fields + commission + mileage. Encrypt SSN before storing in production.
       </p>
 
-      <PaymentBreakdownModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
+      <PaymentBreakdownModal
+        payment={selectedPayment}
+        onClose={() => setSelectedPayment(null)}
+        onSaved={handleBreakdownSaved}
+      />
     </div>
   );
 }

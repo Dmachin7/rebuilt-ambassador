@@ -157,6 +157,15 @@ model Payment {
   amount       Float
   status       PaymentStatus @default(PENDING)
 
+  // Admin corrections for this payment only — when set, these win over the live
+  // Event/Shift/Report-computed breakdown values without affecting other ambassadors
+  // assigned to the same event.
+  onSiteHoursOverride    Float?
+  driveTimeHoursOverride Float?
+  milesOverride          Float?
+  salesOverride          Int?
+  commissionOverride     Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

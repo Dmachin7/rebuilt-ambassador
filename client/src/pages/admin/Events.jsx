@@ -127,8 +127,7 @@ export default function AdminEvents() {
   const [error, setError] = useState('');
   const [ambassadors, setAmbassadors] = useState([]);
   const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
-  const [distanceOverride, setDistanceOverride] = useState({ milesFromHq: '', driveTimeMins: '' }); // editable mileage/drive-time reimbursement inputs; blank = auto-calculate from address
-  const [geocodeFailed, setGeocodeFailed] = useState(false);
+  const [distance, setDistance] = useState({ milesFromHq: '', driveTimeMins: '' }); // manual one-way mileage/drive-time from HQ, factored into mileage reimbursement and paid hours
 
   const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
 
@@ -138,8 +137,7 @@ export default function AdminEvents() {
     setEditingEvent(null);
     setForm(EMPTY_FORM);
     setError('');
-    setDistanceOverride({ milesFromHq: '', driveTimeMins: '' });
-    setGeocodeFailed(false);
+    setDistance({ milesFromHq: '', driveTimeMins: '' });
     setAssignMode('open');
     setModalOpen(true);
     usersAPI.list('AMBASSADOR').then(setAmbassadors).catch(() => {});
@@ -165,8 +163,7 @@ export default function AdminEvents() {
       notes: event.notes || '',
     });
     setError('');
-    setDistanceOverride({ milesFromHq: event.milesFromHq ?? '', driveTimeMins: event.driveTimeMins ?? '' });
-    setGeocodeFailed(false);
+    setDistance({ milesFromHq: event.milesFromHq ?? '', driveTimeMins: event.driveTimeMins ?? '' });
     setModalOpen(true);
   };
 
@@ -175,10 +172,8 @@ export default function AdminEvents() {
       setError('Title, location, and start date are required');
       return;
     }
-    const hasMiles = distanceOverride.milesFromHq !== '';
-    const hasDrive = distanceOverride.driveTimeMins !== '';
-    if (hasMiles !== hasDrive) {
-      setError('Enter both miles and drive time, or leave both blank to auto-calculate from the address');
+    if (distance.milesFromHq === '' || distance.driveTimeMins === '') {
+      setError('Miles from HQ and drive time are required');
       return;
     }
     setSaving(true);
@@ -188,11 +183,9 @@ export default function AdminEvents() {
         ...form,
         date: combineDatetime(form.startDate, form.startTime),
         endTime: form.endDate ? combineDatetime(form.endDate, form.endTime) : null,
+        milesFromHq: distance.milesFromHq,
+        driveTimeMins: distance.driveTimeMins,
       };
-      if (hasMiles && hasDrive) {
-        payload.milesFromHq = distanceOverride.milesFromHq;
-        payload.driveTimeMins = distanceOverride.driveTimeMins;
-      }
       if (editingEvent) {
         await eventsAPI.update(editingEvent.id, payload);
       } else {
@@ -203,7 +196,6 @@ export default function AdminEvents() {
       load();
     } catch (err) {
       setError(err.message);
-      if (err.geocodeFailed) setGeocodeFailed(true);
     } finally {
       setSaving(false);
     }
@@ -310,32 +302,28 @@ export default function AdminEvents() {
 
           <LocationAutocomplete
             value={form.location}
-            onChange={(val) => { set('location')(val); setDistanceOverride({ milesFromHq: '', driveTimeMins: '' }); setGeocodeFailed(false); setError(''); }}
+            onChange={(val) => { set('location')(val); setError(''); }}
           />
 
-          <div className={`rounded-lg p-3 space-y-3 border ${geocodeFailed ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
-            <p className={`text-xs ${geocodeFailed ? 'text-orange-700' : 'text-slate-500'}`}>
-              {geocodeFailed
-                ? "We couldn't automatically calculate the drive distance for this address. Look it up in Google Maps and enter it manually."
-                : 'Miles and drive time from HQ are auto-calculated from the address, factored into mileage reimbursement and paid hours. Override them here if needed.'}
+          <div className="rounded-lg p-3 space-y-3 border bg-slate-50 border-slate-200">
+            <p className="text-xs text-slate-500">
+              Miles and drive time from HQ (one-way) — look these up in Google Maps. Factored into mileage reimbursement and paid hours (both are doubled automatically for the round trip).
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Miles from HQ"
+                label="Miles from HQ *"
                 type="number"
                 min="0"
                 step="0.1"
-                value={distanceOverride.milesFromHq}
-                onChange={(e) => setDistanceOverride((prev) => ({ ...prev, milesFromHq: e.target.value }))}
-                placeholder="Auto"
+                value={distance.milesFromHq}
+                onChange={(e) => setDistance((prev) => ({ ...prev, milesFromHq: e.target.value }))}
               />
               <Input
-                label="Drive Time (mins)"
+                label="Drive Time (mins) *"
                 type="number"
                 min="0"
-                value={distanceOverride.driveTimeMins}
-                onChange={(e) => setDistanceOverride((prev) => ({ ...prev, driveTimeMins: e.target.value }))}
-                placeholder="Auto"
+                value={distance.driveTimeMins}
+                onChange={(e) => setDistance((prev) => ({ ...prev, driveTimeMins: e.target.value }))}
               />
             </div>
           </div>

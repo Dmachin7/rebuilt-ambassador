@@ -2,7 +2,6 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
-const { calculateDistanceFromHQ } = require('../stubs/maps');
 const { withArrivalTime } = require('../lib/time');
 const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail } = require('../services/emailService');
 
@@ -73,16 +72,11 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       return res.status(400).json({ error: 'title, location, and date are required' });
     }
 
-    // Manual override, for addresses the free geocoder can't find
-    let distance = milesFromHq !== undefined && driveTimeMins !== undefined
-      ? { miles: parseFloat(milesFromHq), driveTimeMins: parseInt(driveTimeMins) }
-      : null;
-    if (!distance) {
-      try {
-        distance = await calculateDistanceFromHQ(location);
-      } catch (err) {
-        return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}`, geocodeFailed: true });
-      }
+    // Miles/drive time from HQ are entered manually — no auto-calculation
+    const miles = parseFloat(milesFromHq);
+    const driveMins = parseInt(driveTimeMins);
+    if (milesFromHq === undefined || driveTimeMins === undefined || Number.isNaN(miles) || Number.isNaN(driveMins) || miles < 0 || driveMins < 0) {
+      return res.status(400).json({ error: 'milesFromHq and driveTimeMins (one-way, from HQ) are required and must be non-negative numbers' });
     }
     const totalNeeded = parseInt(ambassadorsNeeded) || 1;
 
@@ -90,8 +84,8 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       data: {
         title,
         location,
-        milesFromHq: distance.miles,
-        driveTimeMins: distance.driveTimeMins,
+        milesFromHq: miles,
+        driveTimeMins: driveMins,
         contactName,
         contactPhone,
         contactEmail,
@@ -171,21 +165,22 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
 
     const data = {};
     if (title !== undefined) data.title = title;
-    if (location !== undefined) {
-      data.location = location;
-      // Manual override, for addresses the free geocoder can't find
-      if (milesFromHq !== undefined && driveTimeMins !== undefined) {
-        data.milesFromHq = parseFloat(milesFromHq);
-        data.driveTimeMins = parseInt(driveTimeMins);
-      } else {
-        try {
-          const distance = await calculateDistanceFromHQ(location);
-          data.milesFromHq = distance.miles;
-          data.driveTimeMins = distance.driveTimeMins;
-        } catch (err) {
-          return res.status(400).json({ error: `Could not calculate drive distance for this location: ${err.message}`, geocodeFailed: true });
-        }
+    if (location !== undefined) data.location = location;
+    // Miles/drive time from HQ are entered manually — no auto-calculation, and independent
+    // of whether the location itself changed.
+    if (milesFromHq !== undefined) {
+      const miles = parseFloat(milesFromHq);
+      if (Number.isNaN(miles) || miles < 0) {
+        return res.status(400).json({ error: 'milesFromHq must be a non-negative number' });
       }
+      data.milesFromHq = miles;
+    }
+    if (driveTimeMins !== undefined) {
+      const driveMins = parseInt(driveTimeMins);
+      if (Number.isNaN(driveMins) || driveMins < 0) {
+        return res.status(400).json({ error: 'driveTimeMins must be a non-negative number' });
+      }
+      data.driveTimeMins = driveMins;
     }
     if (contactName !== undefined) data.contactName = contactName;
     if (contactPhone !== undefined) data.contactPhone = contactPhone;

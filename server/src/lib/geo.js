@@ -1,4 +1,4 @@
-// Free, no-API-key geocoding (Nominatim/OpenStreetMap) and driving-route (OSRM) helpers.
+// Free, no-API-key geocoding (Nominatim/OpenStreetMap) helpers.
 const geocodeCache = new Map();
 
 async function lookupCoords(query) {
@@ -78,19 +78,4 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// One-way driving distance/time along real roads between two coordinates (OSRM public routing API)
-async function getDrivingRoute(origin, destination) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.code !== 'Ok' || !data.routes?.length) {
-    throw new Error('Could not calculate driving route');
-  }
-  const route = data.routes[0];
-  return {
-    miles: Math.round((route.distance / 1609.34) * 10) / 10,
-    driveTimeMins: Math.round(route.duration / 60),
-  };
-}
-
-module.exports = { geocodeAddress, haversineDistance, getDrivingRoute };
+module.exports = { geocodeAddress, haversineDistance };

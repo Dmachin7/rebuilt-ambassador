@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
-const { MILEAGE_RATE, HOURLY_RATE } = require('../config/constants');
+const { MILEAGE_RATE, HOURLY_RATE, MIN_PAID_HOURS } = require('../config/constants');
 
 const router = express.Router();
 
@@ -15,32 +15,46 @@ function pendingSaleCount(sales) {
   return (sales || []).filter((s) => !s.verified).length;
 }
 
-// Adds a read-only pay/reimbursement breakdown to a Payment (with shift.event and
-// shift.report.sales included) without persisting new columns — mirrors the on-the-fly
-// mileage/commission math used elsewhere in this file.
+// Adds a pay/reimbursement breakdown to a Payment (with shift.event and shift.report.sales
+// included), mirroring the on-the-fly mileage/commission math used elsewhere in this file.
+// Any *Override column set on the Payment (via PUT /:id/breakdown) wins over the live
+// Event/Shift/Report-computed value, so an admin correction only affects this one payment.
+//
+// "onSiteHours" here means the full checked-in window (checkout - checkin), which already
+// covers setup time since ambassadors check in when they arrive to set up — setup is not
+// tracked or added as a separate bucket to avoid double-counting.
 function withBreakdown(payment) {
   const event = payment.shift?.event;
-  const onSiteHours = payment.shift?.checkinTime && payment.shift?.checkoutTime
+  const computedOnSiteHours = payment.shift?.checkinTime && payment.shift?.checkoutTime
     ? (new Date(payment.shift.checkoutTime) - new Date(payment.shift.checkinTime)) / 3600000
     : null;
-  const driveTimeHours = ((event?.driveTimeMins || 0) * 2) / 60;
-  const setupTimeHours = (event?.setupTimeMins || 0) / 60;
-  const miles = (event?.milesFromHq || 0) * 2;
-  const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
-  const sales = payment.shift?.report?.totalSales || 0;
-  const commissionEarned = Math.round(verifiedCommission(payment.shift?.report?.sales) * 100) / 100;
+  const computedDriveTimeHours = ((event?.driveTimeMins || 0) * 2) / 60;
+  const computedMiles = (event?.milesFromHq || 0) * 2;
+  const computedSales = payment.shift?.report?.totalSales || 0;
+  const computedCommission = verifiedCommission(payment.shift?.report?.sales);
   const pendingSales = pendingSaleCount(payment.shift?.report?.sales);
+
+  const onSiteHours = payment.onSiteHoursOverride ?? computedOnSiteHours;
+  const driveTimeHours = payment.driveTimeHoursOverride ?? computedDriveTimeHours;
+  const miles = payment.milesOverride ?? computedMiles;
+  const sales = payment.salesOverride ?? computedSales;
+  const commissionEarned = payment.commissionOverride ?? computedCommission;
+  const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
+
   return {
     ...payment,
     breakdown: {
-      onSiteHours: onSiteHours !== null ? Math.round(onSiteHours * 100) / 100 : null,
+      onSiteHours: onSiteHours != null ? Math.round(onSiteHours * 100) / 100 : null,
       driveTimeHours: Math.round(driveTimeHours * 100) / 100,
-      setupTimeHours: Math.round(setupTimeHours * 100) / 100,
       miles: Math.round(miles * 10) / 10,
       mileageReimbursement,
       sales,
-      commissionEarned,
+      commissionEarned: Math.round(commissionEarned * 100) / 100,
       pendingSales,
+      isEdited: [
+        payment.onSiteHoursOverride, payment.driveTimeHoursOverride,
+        payment.milesOverride, payment.salesOverride, payment.commissionOverride,
+      ].some((v) => v != null),
     },
   };
 }
@@ -65,7 +79,7 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
           include: {
             payment: true,
             report: { include: { sales: true } },
-            event: { select: { milesFromHq: true, driveTimeMins: true, setupTimeMins: true } },
+            event: { select: { milesFromHq: true, driveTimeMins: true } },
           },
         },
       },
@@ -78,7 +92,6 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const hourlyPay = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
       const driveTimeHours = completedShifts.reduce((s, sh) => s + ((sh.event?.driveTimeMins || 0) * 2) / 60, 0);
-      const setupTimeHours = completedShifts.reduce((s, sh) => s + (sh.event?.setupTimeMins || 0) / 60, 0);
 
       const milesDriven = completedShifts.reduce((s, sh) => s + (sh.event?.milesFromHq || 0) * 2, 0); // round trip
       const mileageReimbursement = Math.round(milesDriven * MILEAGE_RATE * 100) / 100;
@@ -100,7 +113,6 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
         hoursWorked: Math.round(hoursWorked * 100) / 100,
         hourlyPay,
         driveTimeHours: Math.round(driveTimeHours * 100) / 100,
-        setupTimeHours: Math.round(setupTimeHours * 100) / 100,
         milesDriven: Math.round(milesDriven * 10) / 10,
         mileageReimbursement,
         salesThisPeriod,
@@ -239,6 +251,50 @@ router.put('/bulk-status', verifyToken, requireRole('ADMIN'), async (req, res) =
       data: { status },
     });
     res.json({ updated: result.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/payments/:id/breakdown — admin only, correct one payment's line items
+// (on-site hours, drive hours, miles, sales, commission) without touching the shared
+// Event/Shift/Report data used by other ambassadors on the same event.
+router.put('/:id/breakdown', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { onSiteHours, driveTimeHours, miles, sales, commissionEarned } = req.body;
+    const numericFields = { onSiteHours, driveTimeHours, miles, sales, commissionEarned };
+    for (const [key, value] of Object.entries(numericFields)) {
+      if (value === undefined || value === null) continue;
+      if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+        return res.status(400).json({ error: `${key} must be a non-negative number` });
+      }
+    }
+
+    const hoursWorked = Math.round(
+      Math.max(MIN_PAID_HOURS, (onSiteHours || 0) + (driveTimeHours || 0)) * 100
+    ) / 100;
+    const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
+
+    const payment = await prisma.payment.update({
+      where: { id: req.params.id },
+      data: {
+        hoursWorked,
+        amount,
+        onSiteHoursOverride: onSiteHours,
+        driveTimeHoursOverride: driveTimeHours,
+        milesOverride: miles,
+        salesOverride: sales,
+        commissionOverride: commissionEarned,
+      },
+      include: {
+        ambassador: {
+          select: { id: true, firstName: true, lastName: true, email: true, legalName: true, address: true },
+        },
+        shift: { include: { event: true, report: { include: { sales: true } } } },
+      },
+    });
+    res.json(withBreakdown(payment));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

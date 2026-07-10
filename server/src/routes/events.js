@@ -72,11 +72,11 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       return res.status(400).json({ error: 'title, location, and date are required' });
     }
 
-    // Miles/drive time from HQ are entered manually — no auto-calculation
+    // Miles/drive time are entered manually as round-trip totals — no auto-calculation
     const miles = parseFloat(milesFromHq);
     const driveMins = parseInt(driveTimeMins);
     if (milesFromHq === undefined || driveTimeMins === undefined || Number.isNaN(miles) || Number.isNaN(driveMins) || miles < 0 || driveMins < 0) {
-      return res.status(400).json({ error: 'milesFromHq and driveTimeMins (one-way, from HQ) are required and must be non-negative numbers' });
+      return res.status(400).json({ error: 'milesFromHq and driveTimeMins (round-trip total) are required and must be non-negative numbers' });
     }
     const totalNeeded = parseInt(ambassadorsNeeded) || 1;
 

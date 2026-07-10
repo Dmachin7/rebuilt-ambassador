@@ -127,7 +127,7 @@ export default function AdminEvents() {
   const [error, setError] = useState('');
   const [ambassadors, setAmbassadors] = useState([]);
   const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
-  const [distance, setDistance] = useState({ milesFromHq: '', driveTimeMins: '' }); // manual one-way mileage/drive-time from HQ, factored into mileage reimbursement and paid hours
+  const [distance, setDistance] = useState({ milesFromHq: '', driveTimeMins: '' }); // manual round-trip mileage/drive-time totals, factored into mileage reimbursement and paid hours
 
   const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
 
@@ -275,7 +275,7 @@ export default function AdminEvents() {
                       </span>
                     </div>
                     {event.milesFromHq && (
-                      <div className="text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive</div>
+                      <div className="text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive (round-trip)</div>
                     )}
                   </div>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
@@ -307,11 +307,11 @@ export default function AdminEvents() {
 
           <div className="rounded-lg p-3 space-y-3 border bg-slate-50 border-slate-200">
             <p className="text-xs text-slate-500">
-              Miles and drive time from HQ (one-way) — look these up in Google Maps. Factored into mileage reimbursement and paid hours (both are doubled automatically for the round trip).
+              Round-trip miles and drive time (there and back) — look these up in Google Maps. Factored directly into mileage reimbursement and paid hours.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Miles from HQ *"
+                label="Round-Trip Miles *"
                 type="number"
                 min="0"
                 step="0.1"
@@ -319,7 +319,7 @@ export default function AdminEvents() {
                 onChange={(e) => setDistance((prev) => ({ ...prev, milesFromHq: e.target.value }))}
               />
               <Input
-                label="Drive Time (mins) *"
+                label="Round-Trip Drive Time (mins) *"
                 type="number"
                 min="0"
                 value={distance.driveTimeMins}

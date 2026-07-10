@@ -28,8 +28,8 @@ function withBreakdown(payment) {
   const computedOnSiteHours = payment.shift?.checkinTime && payment.shift?.checkoutTime
     ? (new Date(payment.shift.checkoutTime) - new Date(payment.shift.checkinTime)) / 3600000
     : null;
-  const computedDriveTimeHours = ((event?.driveTimeMins || 0) * 2) / 60;
-  const computedMiles = (event?.milesFromHq || 0) * 2;
+  const computedDriveTimeHours = (event?.driveTimeMins || 0) / 60;
+  const computedMiles = event?.milesFromHq || 0;
   const computedSales = payment.shift?.report?.totalSales || 0;
   const computedCommission = verifiedCommission(payment.shift?.report?.sales);
   const pendingSales = pendingSaleCount(payment.shift?.report?.sales);
@@ -91,9 +91,9 @@ router.get('/biweekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const hoursWorked = completedShifts.reduce((s, sh) => s + (sh.payment?.hoursWorked || 0), 0);
       const hourlyPay = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
-      const driveTimeHours = completedShifts.reduce((s, sh) => s + ((sh.event?.driveTimeMins || 0) * 2) / 60, 0);
+      const driveTimeHours = completedShifts.reduce((s, sh) => s + (sh.event?.driveTimeMins || 0) / 60, 0);
 
-      const milesDriven = completedShifts.reduce((s, sh) => s + (sh.event?.milesFromHq || 0) * 2, 0); // round trip
+      const milesDriven = completedShifts.reduce((s, sh) => s + (sh.event?.milesFromHq || 0), 0);
       const mileageReimbursement = Math.round(milesDriven * MILEAGE_RATE * 100) / 100;
 
       const salesThisPeriod = completedShifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
@@ -155,7 +155,7 @@ router.get('/export/csv', verifyToken, requireRole('ADMIN'), async (req, res) =>
     ];
 
     const rows = payments.map((p) => {
-      const miles = (p.shift.event.milesFromHq || 0) * 2;
+      const miles = p.shift.event.milesFromHq || 0;
       const mileageReimbursement = Math.round(miles * MILEAGE_RATE * 100) / 100;
       const salesThisShift = p.shift.report?.totalSales || 0;
       const commission = verifiedCommission(p.shift.report?.sales);

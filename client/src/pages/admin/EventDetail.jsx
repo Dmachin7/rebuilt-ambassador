@@ -64,7 +64,7 @@ export default function EventDetail() {
           <div className="flex items-center gap-2 mt-1">
             <Badge status={event.status} />
             {event.milesFromHq && (
-              <span className="text-xs text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive</span>
+              <span className="text-xs text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive (round-trip)</span>
             )}
           </div>
         </div>

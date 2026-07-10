@@ -142,7 +142,7 @@ export default function AmbassadorShifts() {
                     <div className="text-orange-600 font-medium">Arrive by {formatTime(shift.event.arrivalTime)} ({shift.event.setupTimeMins}min setup)</div>
                   )}
                   {shift.event.milesFromHq && (
-                    <div className="text-slate-400">{shift.event.milesFromHq} mi · {shift.event.driveTimeMins} min drive from HQ</div>
+                    <div className="text-slate-400">{shift.event.milesFromHq} mi · {shift.event.driveTimeMins} min drive (round-trip)</div>
                   )}
                   <div className="text-slate-400">💰 $20/hr · Setup {shift.event.setupTimeMins}min · Breakdown {shift.event.breakdownTimeMins}min</div>
                 </div>

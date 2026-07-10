@@ -118,12 +118,12 @@ export default function AdminReports() {
               {(report.shift.event.milesFromHq != null || report.shift.event.driveTimeMins != null) && (
                 <div className="bg-slate-50 rounded-lg px-3 py-2 mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-slate-500">
-                    Round-trip: {((report.shift.event.milesFromHq || 0) * 2).toFixed(1)} mi
-                    {report.shift.event.driveTimeMins != null && `, ${report.shift.event.driveTimeMins * 2} min drive`}
+                    Round-trip: {(report.shift.event.milesFromHq || 0).toFixed(1)} mi
+                    {report.shift.event.driveTimeMins != null && `, ${report.shift.event.driveTimeMins} min drive`}
                     {report.shift.event.setupTimeMins ? ` + ${report.shift.event.setupTimeMins} min setup` : ''}
                   </span>
                   <span className="font-semibold text-slate-700">
-                    Mileage reimbursement: {formatCurrency((report.shift.event.milesFromHq || 0) * 2 * MILEAGE_RATE)}
+                    Mileage reimbursement: {formatCurrency((report.shift.event.milesFromHq || 0) * MILEAGE_RATE)}
                   </span>
                 </div>
               )}

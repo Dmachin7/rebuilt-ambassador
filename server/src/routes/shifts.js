@@ -285,8 +285,8 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     // set up, not when selling starts — so setup is not added on top here.
     const checkoutTime = new Date();
     const onSiteHours = (checkoutTime - shift.checkinTime) / 3600000;
-    const roundTripDriveHours = ((shift.event.driveTimeMins || 0) * 2) / 60;
-    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + roundTripDriveHours) * 100) / 100;
+    const driveHours = (shift.event.driveTimeMins || 0) / 60; // event.driveTimeMins is already the total round-trip time
+    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + driveHours) * 100) / 100;
     const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
     const updated = await prisma.shift.update({

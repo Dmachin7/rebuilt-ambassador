@@ -331,6 +331,11 @@ function PaymentBreakdownModal({ payment, onClose, onSaved }) {
   );
 }
 
+// Total payout for a payment record — hourly pay + mileage reimbursement + commission.
+// Must match the total computed in PaymentBreakdownModal.
+const totalPayout = (p) =>
+  Math.round(((p.amount || 0) + (p.breakdown?.mileageReimbursement || 0) + (p.breakdown?.commissionEarned || 0)) * 100) / 100;
+
 // Standard payroll tab
 function PayrollRecords() {
   const [payments, setPayments] = useState([]);
@@ -395,9 +400,9 @@ function PayrollRecords() {
     setSelectedPayment(updated);
   };
 
-  const totalPending = payments.filter((p) => p.status === 'PENDING').reduce((s, p) => s + p.amount, 0);
-  const totalApproved = payments.filter((p) => p.status === 'APPROVED').reduce((s, p) => s + p.amount, 0);
-  const totalPaid = payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + p.amount, 0);
+  const totalPending = payments.filter((p) => p.status === 'PENDING').reduce((s, p) => s + totalPayout(p), 0);
+  const totalApproved = payments.filter((p) => p.status === 'APPROVED').reduce((s, p) => s + totalPayout(p), 0);
+  const totalPaid = payments.filter((p) => p.status === 'PAID').reduce((s, p) => s + totalPayout(p), 0);
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
@@ -515,7 +520,7 @@ function PayrollRecords() {
                         <div className="text-xs text-slate-400 font-normal">{formatCurrency(p.breakdown.mileageReimbursement)}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(p.amount)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatCurrency(totalPayout(p))}</td>
                     <td className="px-4 py-3 text-center"><Badge status={p.status} /></td>
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <select

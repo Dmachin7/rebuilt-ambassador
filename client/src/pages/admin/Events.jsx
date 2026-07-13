@@ -7,6 +7,7 @@ import { Plus, MapPin, Clock, Users, Trash2, Edit2 } from 'lucide-react';
 import { autocompleteLocation } from '../../stubs/maps.js';
 
 const PICKUP_LOCATIONS = [
+  'Rebuilt Downstairs Fridge',
   'Anytime Fitness Clearwater',
   'Anytime Fitness Tarpon Springs',
   'Bayshore Fit',

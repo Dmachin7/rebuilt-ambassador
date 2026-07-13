@@ -74,6 +74,7 @@ model Event {
   id                String      @id @default(cuid())
   title             String
   location          String
+  pickupLocation    String?
   milesFromHq       Float?
   driveTimeMins     Int?
   contactName       String?

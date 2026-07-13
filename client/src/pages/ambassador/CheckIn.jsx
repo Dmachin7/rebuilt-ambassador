@@ -4,7 +4,7 @@ import { shiftsAPI } from '../../api/index.js';
 import { getCurrentLocation } from '../../stubs/gps.js';
 import { Card, Button, Badge, Spinner } from '../../components/ui/index.jsx';
 import { formatShortDate, formatDateTime } from '../../utils/formatters.js';
-import { Camera, MapPin, CheckCircle, Clock } from 'lucide-react';
+import { Camera, MapPin, Package, CheckCircle, Clock } from 'lucide-react';
 
 export default function CheckIn() {
   const { shiftId } = useParams();
@@ -17,7 +17,7 @@ export default function CheckIn() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle'); // idle | checking | ok | error
   const [done, setDone] = useState(false);
-  const [locationIssue, setLocationIssue] = useState(null); // { distanceFeet } | null — offers a manual override
+  const [locationIssue, setLocationIssue] = useState(null); // { distanceFeet } | { gpsFailed, message } | null — offers a manual override
   const fileRef = useRef(null);
 
   const loadShifts = async () => {
@@ -42,15 +42,31 @@ export default function CheckIn() {
   const handleCheckin = async (targetShift, override = false) => {
     setChecking(true);
     setLocationStatus('checking');
-    try {
-      const gps = await getCurrentLocation();
-      setLocationStatus('ok');
 
+    let gps = null;
+    try {
+      gps = await getCurrentLocation();
+      setLocationStatus('ok');
+    } catch (err) {
+      setLocationStatus('error');
+      // GPS itself failed (permission denied, unavailable, timeout, unsupported browser). If this
+      // isn't already an override attempt, offer one instead of dead-ending on an alert — the
+      // ambassador may well be on-site with a phone that just can't get a location fix.
+      if (!override) {
+        setLocationIssue({ gpsFailed: true, message: err.message });
+        setChecking(false);
+        return;
+      }
+    }
+
+    try {
       const formData = new FormData();
       if (photo) formData.append('photo', photo);
-      formData.append('lat', gps.lat);
-      formData.append('lng', gps.lng);
-      if (gps.accuracy != null) formData.append('accuracy', gps.accuracy);
+      if (gps) {
+        formData.append('lat', gps.lat);
+        formData.append('lng', gps.lng);
+        if (gps.accuracy != null) formData.append('accuracy', gps.accuracy);
+      }
       if (override) formData.append('locationOverride', 'true');
 
       await shiftsAPI.checkin(targetShift.id, formData);
@@ -145,6 +161,9 @@ export default function CheckIn() {
         </div>
         <div className="space-y-1.5 text-xs text-slate-500">
           <div className="flex items-start gap-1.5"><MapPin size={12} className="mt-0.5 shrink-0" />{targetShift?.event.location}</div>
+          {targetShift?.event.pickupLocation && (
+            <div className="flex items-start gap-1.5"><Package size={12} className="mt-0.5 shrink-0" />Pickup: {targetShift.event.pickupLocation}</div>
+          )}
           <div className="flex items-center gap-1.5"><Clock size={12} />{formatShortDate(targetShift?.event.date)}</div>
           {isCheckedIn && targetShift?.checkinTime && (
             <div className="text-green-600 font-medium">Checked in at {formatDateTime(targetShift.checkinTime)}</div>
@@ -176,11 +195,13 @@ export default function CheckIn() {
         <p className="text-xs text-slate-400 mt-2">Must be within 1000ft of the event location to check in.</p>
       </Card>
 
-      {/* Location override — shown when the geofence check fails */}
+      {/* Location override — shown when the geofence check fails, or when GPS itself couldn't get a fix at all */}
       {locationIssue && (
         <Card className="p-4 border-orange-200 bg-orange-50">
           <p className="text-sm text-orange-700">
-            You appear to be about {locationIssue.distanceFeet}ft from the event location. If you're at the right place and your phone's GPS is having trouble, you can check in anyway.
+            {locationIssue.gpsFailed
+              ? `We couldn't get a location fix (${locationIssue.message}). If you're at the event, you can check in anyway.`
+              : `You appear to be about ${locationIssue.distanceFeet}ft from the event location. If you're at the right place and your phone's GPS is having trouble, you can check in anyway.`}
           </p>
           <Button
             onClick={() => handleCheckin(targetShift, true)}

@@ -62,7 +62,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
     const {
-      title, location, contactName, contactPhone, contactEmail,
+      title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
       milesFromHq, driveTimeMins,
@@ -84,6 +84,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       data: {
         title,
         location,
+        pickupLocation: pickupLocation || null,
         milesFromHq: miles,
         driveTimeMins: driveMins,
         contactName,
@@ -155,7 +156,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
 router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
     const {
-      title, location, contactName, contactPhone, contactEmail,
+      title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, status,
       milesFromHq, driveTimeMins,
@@ -166,6 +167,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     const data = {};
     if (title !== undefined) data.title = title;
     if (location !== undefined) data.location = location;
+    if (pickupLocation !== undefined) data.pickupLocation = pickupLocation || null;
     // Miles/drive time from HQ are entered manually — no auto-calculation, and independent
     // of whether the location itself changed.
     if (milesFromHq !== undefined) {

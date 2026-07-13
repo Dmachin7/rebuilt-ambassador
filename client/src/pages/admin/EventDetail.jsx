@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
 import { Card, Button, Badge, Modal, Select, Spinner } from '../../components/ui/index.jsx';
 import { formatCurrency, formatDateTime, formatDate, formatHours, formatTime } from '../../utils/formatters.js';
-import { ArrowLeft, MapPin, Phone, Mail, Clock, Users, UserPlus, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MapPin, Package, Phone, Mail, Clock, Users, UserPlus, MessageSquare } from 'lucide-react';
 
 export default function EventDetail() {
   const { id } = useParams();
@@ -83,6 +83,12 @@ export default function EventDetail() {
                 <MapPin size={15} className="text-slate-400 mt-0.5 shrink-0" />
                 <span className="text-slate-700">{event.location}</span>
               </div>
+              {event.pickupLocation && (
+                <div className="flex items-start gap-2">
+                  <Package size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                  <span className="text-slate-700">Pickup: {event.pickupLocation}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Clock size={15} className="text-slate-400 shrink-0" />
                 <span className="text-slate-700">{formatDateTime(event.date)}</span>

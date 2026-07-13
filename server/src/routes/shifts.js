@@ -210,30 +210,37 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
 
     const ambassadorLat = parseFloat(req.body.lat);
     const ambassadorLng = parseFloat(req.body.lng);
+    const hasCoords = !isNaN(ambassadorLat) && !isNaN(ambassadorLng);
+    const overrideRequested = req.body.locationOverride === 'true' || req.body.locationOverride === true;
 
-    if (isNaN(ambassadorLat) || isNaN(ambassadorLng)) {
+    if (!hasCoords && !overrideRequested) {
       return res.status(400).json({ error: 'Location is required to check in' });
     }
 
-    const eventCoords = await geocodeAddress(shift.event.location);
-    const distance = haversineDistance(ambassadorLat, ambassadorLng, eventCoords.lat, eventCoords.lng);
+    // withinRadius stays false when we have no coords at all (GPS failed on the device) —
+    // an override is required in that case, same as being outside the geofence.
+    let withinRadius = false;
 
-    // Give benefit of the doubt up to the device's own reported GPS accuracy (capped) — phones
-    // and especially laptops often report low-confidence locations that can be off by hundreds
-    // of feet even when the ambassador is genuinely on-site.
-    const reportedAccuracy = parseFloat(req.body.accuracy);
-    const accuracyGrace = isNaN(reportedAccuracy) ? 0 : Math.min(reportedAccuracy, CHECKIN_MAX_ACCURACY_GRACE_METERS);
-    const effectiveRadius = CHECKIN_RADIUS_METERS + accuracyGrace;
+    if (hasCoords) {
+      const eventCoords = await geocodeAddress(shift.event.location);
+      const distance = haversineDistance(ambassadorLat, ambassadorLng, eventCoords.lat, eventCoords.lng);
 
-    const withinRadius = distance <= effectiveRadius;
-    const overrideRequested = req.body.locationOverride === 'true' || req.body.locationOverride === true;
+      // Give benefit of the doubt up to the device's own reported GPS accuracy (capped) — phones
+      // and especially laptops often report low-confidence locations that can be off by hundreds
+      // of feet even when the ambassador is genuinely on-site.
+      const reportedAccuracy = parseFloat(req.body.accuracy);
+      const accuracyGrace = isNaN(reportedAccuracy) ? 0 : Math.min(reportedAccuracy, CHECKIN_MAX_ACCURACY_GRACE_METERS);
+      const effectiveRadius = CHECKIN_RADIUS_METERS + accuracyGrace;
 
-    if (!withinRadius && !overrideRequested) {
-      const feet = Math.round(distance * 3.28084);
-      return res.status(400).json({
-        error: `You are ${feet}ft from the event location. You must be within ${CHECKIN_RADIUS_FEET}ft to check in.`,
-        distanceFeet: feet,
-      });
+      withinRadius = distance <= effectiveRadius;
+
+      if (!withinRadius && !overrideRequested) {
+        const feet = Math.round(distance * 3.28084);
+        return res.status(400).json({
+          error: `You are ${feet}ft from the event location. You must be within ${CHECKIN_RADIUS_FEET}ft to check in.`,
+          distanceFeet: feet,
+        });
+      }
     }
 
     const photoResult = req.file ? await uploadPhoto(req.file) : { url: null };

@@ -1,13 +1,46 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { eventsAPI, usersAPI } from '../../api/index.js';
-import { Card, Button, Badge, Modal, Input, Textarea, Spinner, EmptyState } from '../../components/ui/index.jsx';
+import { Card, Button, Badge, Modal, Input, Textarea, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatShortDate } from '../../utils/formatters.js';
 import { Plus, MapPin, Clock, Users, Trash2, Edit2 } from 'lucide-react';
 import { autocompleteLocation } from '../../stubs/maps.js';
 
+const PICKUP_LOCATIONS = [
+  'Anytime Fitness Clearwater',
+  'Anytime Fitness Tarpon Springs',
+  'Bayshore Fit',
+  'Burg CrossFit Downtown',
+  'Burn Boot Camp Brandon',
+  'Burn Boot Camp South Tampa',
+  'Burn Boot Camp Apollo Beach',
+  'Camp Tampa',
+  'NOEQL',
+  'CrossFit Brooksville',
+  'CrossFit Manatee',
+  'CrosssFit St. Pete',
+  'Elevate St. Pete',
+  'F45 Training Largo East',
+  'F45 Training Riverview',
+  'F45 Wiregrass',
+  'F45 Midtown Tampa',
+  'F45 Training Lakeland Heights',
+  'F45 Training Sarasota UTC',
+  'Fit24 Tampa',
+  'Fit Body Boot Camp - Lutz',
+  'Level Up Westchase',
+  'MAXX Nutrition & Smoothies',
+  'Nutrishop South Tampa',
+  'Perform24',
+  'Seven Springs Crossfit',
+  'crossfit AERO',
+  'Train Harder CrossFit',
+  'TrYumph Fitness',
+  'Sunshine City Crossfit',
+];
+
 const EMPTY_FORM = {
-  title: '', location: '', contactName: '', contactPhone: '', contactEmail: '',
+  title: '', location: '', pickupLocation: '', contactName: '', contactPhone: '', contactEmail: '',
   startDate: '', startTime: '', endDate: '', endTime: '',
   setupTimeMins: 30, ambassadorsNeeded: 1,
   samplesNeeded: '', snackBitesNeeded: '', notes: '',
@@ -149,6 +182,7 @@ export default function AdminEvents() {
     setForm({
       title: event.title,
       location: event.location,
+      pickupLocation: event.pickupLocation || '',
       contactName: event.contactName || '',
       contactPhone: event.contactPhone || '',
       contactEmail: event.contactEmail || '',
@@ -304,6 +338,13 @@ export default function AdminEvents() {
             value={form.location}
             onChange={(val) => { set('location')(val); setError(''); }}
           />
+
+          <Select label="Pickup Location" value={form.pickupLocation} onChange={f('pickupLocation')}>
+            <option value="">— Select —</option>
+            {PICKUP_LOCATIONS.map((loc) => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </Select>
 
           <div className="rounded-lg p-3 space-y-3 border bg-slate-50 border-slate-200">
             <p className="text-xs text-slate-500">

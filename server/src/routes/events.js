@@ -7,9 +7,23 @@ const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail }
 
 const router = express.Router();
 
+// Event.status is otherwise only ever set manually (e.g. CANCELLED via the API) — without this,
+// past events sit at their UPCOMING default forever. Flips events to COMPLETED once they're over.
+async function syncCompletedEvents() {
+  const now = new Date();
+  await prisma.event.updateMany({
+    where: {
+      status: { in: ['UPCOMING', 'ACTIVE'] },
+      OR: [{ endTime: { lt: now } }, { endTime: null, date: { lt: now } }],
+    },
+    data: { status: 'COMPLETED' },
+  });
+}
+
 // GET /api/events
 router.get('/', verifyToken, async (req, res) => {
   try {
+    await syncCompletedEvents();
     const { status } = req.query;
     const where = status ? { status } : {};
     const events = await prisma.event.findMany({
@@ -34,6 +48,7 @@ router.get('/', verifyToken, async (req, res) => {
 // GET /api/events/:id
 router.get('/:id', verifyToken, async (req, res) => {
   try {
+    await syncCompletedEvents();
     const event = await prisma.event.findUnique({
       where: { id: req.params.id },
       include: {

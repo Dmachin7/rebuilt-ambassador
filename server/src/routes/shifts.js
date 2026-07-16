@@ -12,6 +12,16 @@ const { MIN_PAID_HOURS, HOURLY_RATE } = require('../config/constants');
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
+// On-site hours already covers setup time — ambassadors check in when they arrive to set up,
+// not when selling starts — so setup is not added on top here.
+function computePay(checkinTime, checkoutTime, driveTimeMins) {
+  const onSiteHours = (checkoutTime - checkinTime) / 3600000;
+  const driveHours = (driveTimeMins || 0) / 60; // driveTimeMins is already the total round-trip time
+  const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + driveHours) * 100) / 100;
+  const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
+  return { hoursWorked, amount };
+}
+
 // GET /api/shifts/open
 router.get('/open', verifyToken, async (req, res) => {
   try {
@@ -256,13 +266,8 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     if (!shift.checkinTime) return res.status(400).json({ error: 'Must check in first' });
     if (shift.checkoutTime) return res.status(400).json({ error: 'Already checked out' });
 
-    // On-site hours already covers setup time — ambassadors check in when they arrive to
-    // set up, not when selling starts — so setup is not added on top here.
     const checkoutTime = new Date();
-    const onSiteHours = (checkoutTime - shift.checkinTime) / 3600000;
-    const driveHours = (shift.event.driveTimeMins || 0) / 60; // event.driveTimeMins is already the total round-trip time
-    const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + driveHours) * 100) / 100;
-    const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
+    const { hoursWorked, amount } = computePay(shift.checkinTime, checkoutTime, shift.event.driveTimeMins);
 
     const updated = await prisma.shift.update({
       where: { id: req.params.id },
@@ -296,6 +301,59 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
         }
       })
       .catch((err) => console.error('[CHECKOUT NOTIFY]', err));
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/shifts/:id/admin-times — admin sets/corrects check-in and check-out times directly.
+// For backfilling shifts from events where an ambassador couldn't check in through the app.
+router.put('/:id/admin-times', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const shift = await prisma.shift.findUnique({ where: { id: req.params.id }, include: { event: true } });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (!shift.ambassadorId) return res.status(400).json({ error: 'Shift has no ambassador assigned' });
+
+    const { checkinTime, checkoutTime } = req.body;
+    const parsedCheckin = checkinTime ? new Date(checkinTime) : null;
+    const parsedCheckout = checkoutTime ? new Date(checkoutTime) : null;
+    if (checkinTime && isNaN(parsedCheckin.getTime())) {
+      return res.status(400).json({ error: 'Invalid check-in time' });
+    }
+    if (checkoutTime && isNaN(parsedCheckout.getTime())) {
+      return res.status(400).json({ error: 'Invalid check-out time' });
+    }
+    if (parsedCheckout && !parsedCheckin) {
+      return res.status(400).json({ error: 'Check-in time is required if check-out time is set' });
+    }
+    if (parsedCheckin && parsedCheckout && parsedCheckout <= parsedCheckin) {
+      return res.status(400).json({ error: 'Check-out must be after check-in' });
+    }
+
+    const updated = await prisma.shift.update({
+      where: { id: req.params.id },
+      data: {
+        checkinTime: parsedCheckin,
+        checkoutTime: parsedCheckout,
+        status: parsedCheckout ? 'COMPLETED' : parsedCheckin ? 'CHECKED_IN' : 'ASSIGNED',
+        checkedInByAdmin: !!parsedCheckin,
+      },
+    });
+
+    if (parsedCheckin && parsedCheckout) {
+      const { hoursWorked, amount } = computePay(parsedCheckin, parsedCheckout, shift.event.driveTimeMins);
+      const existingPayment = await prisma.payment.findUnique({ where: { shiftId: shift.id } });
+      if (existingPayment) {
+        await prisma.payment.update({ where: { shiftId: shift.id }, data: { hoursWorked, amount } });
+      } else {
+        await prisma.payment.create({
+          data: { shiftId: shift.id, ambassadorId: shift.ambassadorId, hoursWorked, amount, status: 'PENDING' },
+        });
+      }
+    }
 
     res.json(updated);
   } catch (err) {

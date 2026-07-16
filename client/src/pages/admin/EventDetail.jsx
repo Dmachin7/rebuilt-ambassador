@@ -1,9 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
-import { Card, Button, Badge, Modal, Select, Spinner } from '../../components/ui/index.jsx';
+import { eventsAPI, shiftsAPI, usersAPI, reportsAPI } from '../../api/index.js';
+import { Card, Button, Badge, Modal, Select, Input, Textarea, Spinner } from '../../components/ui/index.jsx';
 import { formatCurrency, formatDateTime, formatDate, formatHours, formatTime } from '../../utils/formatters.js';
-import { ArrowLeft, MapPin, Package, Phone, Mail, Clock, Users, UserPlus, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MapPin, Package, Phone, Mail, Clock, Users, UserPlus, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react';
+
+const COMMISSION_UNDER = 20;
+const COMMISSION_OVER = 40;
+let nextSaleId = 0;
+
+// datetime-local <input> needs "YYYY-MM-DDTHH:mm" in the browser's local time
+const toLocalInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 export default function EventDetail() {
   const { id } = useParams();
@@ -13,6 +25,15 @@ export default function EventDetail() {
   const [assignModal, setAssignModal] = useState(null);
   const [selectedAmb, setSelectedAmb] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [editShiftId, setEditShiftId] = useState(null);
+  const [editTimes, setEditTimes] = useState({ checkinTime: '', checkoutTime: '' });
+  const [savingTimes, setSavingTimes] = useState(false);
+  const [timesError, setTimesError] = useState('');
+  const [reportForm, setReportForm] = useState({ feedback: '', issues: '', mealsSold: '' });
+  const [sales, setSales] = useState([]);
+  const [savingReport, setSavingReport] = useState(false);
+  const [reportError, setReportError] = useState('');
 
   const load = async () => {
     const [ev, ambs] = await Promise.all([
@@ -67,11 +88,66 @@ export default function EventDetail() {
     }
   };
 
+  const openEdit = (shift) => {
+    setEditShiftId(shift.id);
+    setEditTimes({ checkinTime: toLocalInput(shift.checkinTime), checkoutTime: toLocalInput(shift.checkoutTime) });
+    setTimesError('');
+    setReportForm({ feedback: '', issues: '', mealsSold: '' });
+    setSales([]);
+    setReportError('');
+  };
+
+  const handleSaveTimes = async () => {
+    setSavingTimes(true);
+    setTimesError('');
+    try {
+      await shiftsAPI.setAdminTimes(editShiftId, {
+        checkinTime: editTimes.checkinTime ? new Date(editTimes.checkinTime).toISOString() : null,
+        checkoutTime: editTimes.checkoutTime ? new Date(editTimes.checkoutTime).toISOString() : null,
+      });
+      await load();
+    } catch (err) {
+      setTimesError(err.message);
+    } finally {
+      setSavingTimes(false);
+    }
+  };
+
+  const addSale = () => setSales((prev) => [...prev, { id: nextSaleId++, overThreshold: false }]);
+  const removeSale = (saleId) => setSales((prev) => prev.filter((s) => s.id !== saleId));
+  const toggleSale = (saleId) => setSales((prev) => prev.map((s) => (s.id === saleId ? { ...s, overThreshold: !s.overThreshold } : s)));
+
+  const handleSaveReport = async () => {
+    if (!reportForm.feedback.trim()) { setReportError('Feedback is required'); return; }
+    setSavingReport(true);
+    setReportError('');
+    try {
+      await reportsAPI.create({
+        shiftId: editShiftId,
+        feedback: reportForm.feedback,
+        issues: reportForm.issues || undefined,
+        mealsSold: reportForm.mealsSold || 0,
+        sales: sales.map((s) => ({ overThreshold: s.overThreshold })),
+      });
+      await load();
+    } catch (err) {
+      setReportError(err.message);
+    } finally {
+      setSavingReport(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
   if (!event) return <div className="text-center py-20 text-slate-500">Event not found</div>;
 
   const assignedShifts = event.shifts.filter((s) => s.ambassadorId);
   const openShifts = event.shifts.filter((s) => !s.ambassadorId);
+  const editingShift = event.shifts.find((s) => s.id === editShiftId) || null;
+  const editAvgMeals =
+    reportForm.mealsSold && sales.length > 0
+      ? (parseInt(reportForm.mealsSold) / sales.length).toFixed(1)
+      : null;
+  const editEstimatedCommission = sales.reduce((s, sale) => s + (sale.overThreshold ? COMMISSION_OVER : COMMISSION_UNDER), 0);
 
   return (
     <div className="space-y-6">
@@ -182,7 +258,7 @@ export default function EventDetail() {
                       <span className="text-sm text-slate-400 italic">Open shift</span>
                     )}
                     {shift.report && (
-                      <div className="mt-1 text-xs text-green-600">✓ Report submitted · {shift.report.salesCount} sales · {shift.report.signupsCount} sign-ups</div>
+                      <div className="mt-1 text-xs text-green-600">✓ Report submitted · {shift.report.totalSales} sales · {shift.report.mealsSold} meals sold</div>
                     )}
                     {shift.payment && (
                       <div className="mt-0.5 text-xs text-slate-400">
@@ -200,6 +276,9 @@ export default function EventDetail() {
                         {shift.checkinTime && !shift.checkoutTime && (
                           <button onClick={() => handleAdminCheckout(shift.id)} className="text-xs text-yellow-600 hover:text-yellow-700">Check Out</button>
                         )}
+                        <button onClick={() => openEdit(shift)} className="text-xs text-slate-400 hover:text-mint-600 flex items-center gap-1">
+                          <Pencil size={11} /> Edit
+                        </button>
                         <button onClick={() => handleUnassign(shift.id)} className="text-xs text-slate-400 hover:text-red-500">Remove</button>
                       </>
                     ) : (
@@ -227,9 +306,9 @@ export default function EventDetail() {
                         {shift.ambassador?.firstName} {shift.ambassador?.lastName}
                       </span>
                       <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                        <span>🛒 {shift.report.salesCount} sales</span>
-                        <span>✋ {shift.report.signupsCount} sign-ups</span>
-                        {shift.report.mealsPerSale && <span>🍽 {shift.report.mealsPerSale} meals/sale</span>}
+                        <span>🛒 {shift.report.totalSales} sales</span>
+                        <span>🍽 {shift.report.mealsSold} meals sold</span>
+                        {shift.report.mealsPerSale && <span>{shift.report.mealsPerSale} meals/sale</span>}
                       </div>
                     </div>
                     <p className="text-sm text-slate-600">{shift.report.feedback}</p>
@@ -282,6 +361,114 @@ export default function EventDetail() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Shift Modal — backfill check-in/out times and sales report for shifts that had app issues */}
+      <Modal isOpen={!!editingShift} onClose={() => setEditShiftId(null)} title="Edit Shift" size="lg">
+        {editingShift && (
+          <div className="space-y-5">
+            <p className="text-sm text-slate-500">
+              {editingShift.ambassador?.firstName} {editingShift.ambassador?.lastName} — {event.title}
+            </p>
+
+            <Card className="p-4 space-y-3">
+              <p className="text-sm font-medium text-slate-700">Check-in / Check-out Times</p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <Input
+                  label="Check-in"
+                  type="datetime-local"
+                  value={editTimes.checkinTime}
+                  onChange={(e) => setEditTimes({ ...editTimes, checkinTime: e.target.value })}
+                />
+                <Input
+                  label="Check-out"
+                  type="datetime-local"
+                  value={editTimes.checkoutTime}
+                  onChange={(e) => setEditTimes({ ...editTimes, checkoutTime: e.target.value })}
+                />
+              </div>
+              {timesError && <div className="text-sm text-red-600">{timesError}</div>}
+              <Button onClick={handleSaveTimes} disabled={savingTimes} size="sm">
+                {savingTimes ? 'Saving...' : 'Save Times'}
+              </Button>
+            </Card>
+
+            {editingShift.report ? (
+              <Card className="p-4">
+                <p className="text-sm font-medium text-slate-700 mb-1">Report already submitted</p>
+                <p className="text-xs text-slate-500">{editingShift.report.totalSales} sales · {editingShift.report.mealsSold} meals sold</p>
+              </Card>
+            ) : (
+              <Card className="p-4 space-y-4">
+                <p className="text-sm font-medium text-slate-700">Post-Event Report</p>
+                <Textarea
+                  label="How did the event go? *"
+                  value={reportForm.feedback}
+                  onChange={(e) => setReportForm({ ...reportForm, feedback: e.target.value })}
+                  rows={3}
+                />
+                <Textarea
+                  label="Issues encountered"
+                  value={reportForm.issues}
+                  onChange={(e) => setReportForm({ ...reportForm, issues: e.target.value })}
+                  rows={2}
+                />
+                <Input
+                  label="Total Meals Sold"
+                  type="number"
+                  min="0"
+                  value={reportForm.mealsSold}
+                  onChange={(e) => setReportForm({ ...reportForm, mealsSold: e.target.value })}
+                  placeholder="0"
+                />
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-slate-700">Sales & Commission</p>
+                    <span className="text-xs text-slate-400">{sales.length} sale{sales.length !== 1 ? 's' : ''}{editAvgMeals ? ` · ${editAvgMeals} meals/sale` : ''}</span>
+                  </div>
+                  {sales.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {sales.map((sale, i) => (
+                        <div key={sale.id} className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2.5">
+                          <span className="text-xs font-medium text-slate-500 w-12 shrink-0">Sale {i + 1}</span>
+                          <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                            <input type="checkbox" checked={sale.overThreshold} onChange={() => toggleSale(sale.id)} className="accent-mint-600" />
+                            <span className="text-sm text-slate-700">$99 or more</span>
+                          </label>
+                          <span className={`text-sm font-semibold ${sale.overThreshold ? 'text-mint-600' : 'text-slate-500'}`}>
+                            {formatCurrency(sale.overThreshold ? COMMISSION_OVER : COMMISSION_UNDER)}
+                          </span>
+                          <button type="button" onClick={() => removeSale(sale.id)} className="text-slate-300 hover:text-red-500 shrink-0">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Button type="button" variant="secondary" size="sm" onClick={addSale} className="w-full">
+                    <Plus size={14} /> Add Sale
+                  </Button>
+                  {sales.length > 0 && (
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                      <span className="text-sm text-slate-600">Estimated commission</span>
+                      <span className="text-lg font-bold text-mint-600">{formatCurrency(editEstimatedCommission)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {reportError && <div className="text-sm text-red-600">{reportError}</div>}
+                <Button onClick={handleSaveReport} disabled={savingReport} className="w-full">
+                  {savingReport ? 'Saving...' : 'Save Report'}
+                </Button>
+              </Card>
+            )}
+
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={() => setEditShiftId(null)}>Close</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

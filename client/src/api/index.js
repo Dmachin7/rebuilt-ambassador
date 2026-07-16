@@ -25,6 +25,7 @@ export const shiftsAPI = {
   unassign: (id) => api.post(`/shifts/${id}/unassign`),
   checkin: (id, formData) => api.postForm(`/shifts/${id}/checkin`, formData),
   checkout: (id) => api.post(`/shifts/${id}/checkout`),
+  setAdminTimes: (id, data) => api.put(`/shifts/${id}/admin-times`, data),
 };
 
 // Reports

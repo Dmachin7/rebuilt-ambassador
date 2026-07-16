@@ -6,9 +6,8 @@ const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
 const { sendShiftAssignedEmail, sendShiftPickupEmail, sendCheckInNotificationEmail, sendCheckoutNotificationEmail } = require('../services/emailService');
-const { geocodeAddress, haversineDistance } = require('../lib/geo');
 const { withShiftArrivalTime } = require('../lib/time');
-const { MIN_PAID_HOURS, HOURLY_RATE, CHECKIN_RADIUS_FEET, CHECKIN_RADIUS_METERS, CHECKIN_MAX_ACCURACY_GRACE_METERS } = require('../config/constants');
+const { MIN_PAID_HOURS, HOURLY_RATE } = require('../config/constants');
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
@@ -208,42 +207,11 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
     }
     if (shift.checkinTime) return res.status(400).json({ error: 'Already checked in' });
 
-    const ambassadorLat = parseFloat(req.body.lat);
-    const ambassadorLng = parseFloat(req.body.lng);
-    const hasCoords = !isNaN(ambassadorLat) && !isNaN(ambassadorLng);
-    const overrideRequested = req.body.locationOverride === 'true' || req.body.locationOverride === true;
-
-    if (!hasCoords && !overrideRequested) {
-      return res.status(400).json({ error: 'Location is required to check in' });
-    }
-
-    // withinRadius stays false when we have no coords at all (GPS failed on the device) —
-    // an override is required in that case, same as being outside the geofence.
-    let withinRadius = false;
-
-    if (hasCoords) {
-      const eventCoords = await geocodeAddress(shift.event.location);
-      const distance = haversineDistance(ambassadorLat, ambassadorLng, eventCoords.lat, eventCoords.lng);
-
-      // Give benefit of the doubt up to the device's own reported GPS accuracy (capped) — phones
-      // and especially laptops often report low-confidence locations that can be off by hundreds
-      // of feet even when the ambassador is genuinely on-site.
-      const reportedAccuracy = parseFloat(req.body.accuracy);
-      const accuracyGrace = isNaN(reportedAccuracy) ? 0 : Math.min(reportedAccuracy, CHECKIN_MAX_ACCURACY_GRACE_METERS);
-      const effectiveRadius = CHECKIN_RADIUS_METERS + accuracyGrace;
-
-      withinRadius = distance <= effectiveRadius;
-
-      if (!withinRadius && !overrideRequested) {
-        const feet = Math.round(distance * 3.28084);
-        return res.status(400).json({
-          error: `You are ${feet}ft from the event location. You must be within ${CHECKIN_RADIUS_FEET}ft to check in.`,
-          distanceFeet: feet,
-        });
-      }
-    }
-
     const photoResult = req.file ? await uploadPhoto(req.file) : { url: null };
+
+    // Admins can check in on behalf of an ambassador (e.g. if the ambassador hits an app error) —
+    // track that so it's visible in the event detail view.
+    const checkedInByAdmin = req.user.role === 'ADMIN' && shift.ambassadorId !== req.user.id;
 
     const updated = await prisma.shift.update({
       where: { id: req.params.id },
@@ -251,7 +219,7 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
         checkinTime: new Date(),
         checkinPhotoUrl: photoResult.url,
         status: 'CHECKED_IN',
-        locationOverride: !withinRadius,
+        checkedInByAdmin,
       },
     });
 

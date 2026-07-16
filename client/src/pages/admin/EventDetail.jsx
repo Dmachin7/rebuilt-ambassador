@@ -47,6 +47,26 @@ export default function EventDetail() {
     load();
   };
 
+  const handleAdminCheckin = async (shiftId) => {
+    if (!confirm('Check in this ambassador now?')) return;
+    try {
+      await shiftsAPI.checkin(shiftId, new FormData());
+      load();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleAdminCheckout = async (shiftId) => {
+    if (!confirm('Check out this ambassador now?')) return;
+    try {
+      await shiftsAPI.checkout(shiftId);
+      load();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
   if (!event) return <div className="text-center py-20 text-slate-500">Event not found</div>;
 
@@ -151,8 +171,8 @@ export default function EventDetail() {
                             <div className="text-xs text-slate-400">
                               In: {formatDateTime(shift.checkinTime)}
                               {shift.checkoutTime && ` · Out: ${formatDateTime(shift.checkoutTime)}`}
-                              {shift.locationOverride && (
-                                <span className="ml-1.5 text-orange-500 font-medium">· 📍 location override used</span>
+                              {shift.checkedInByAdmin && (
+                                <span className="ml-1.5 text-orange-500 font-medium">· 👤 checked in by admin</span>
                               )}
                             </div>
                           )}
@@ -173,7 +193,15 @@ export default function EventDetail() {
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge status={shift.status} />
                     {shift.ambassador ? (
-                      <button onClick={() => handleUnassign(shift.id)} className="text-xs text-slate-400 hover:text-red-500">Remove</button>
+                      <>
+                        {!shift.checkinTime && (
+                          <button onClick={() => handleAdminCheckin(shift.id)} className="text-xs text-mint-600 hover:text-mint-700">Check In</button>
+                        )}
+                        {shift.checkinTime && !shift.checkoutTime && (
+                          <button onClick={() => handleAdminCheckout(shift.id)} className="text-xs text-yellow-600 hover:text-yellow-700">Check Out</button>
+                        )}
+                        <button onClick={() => handleUnassign(shift.id)} className="text-xs text-slate-400 hover:text-red-500">Remove</button>
+                      </>
                     ) : (
                       <button onClick={() => { setAssignModal(shift); setSelectedAmb(''); }} className="text-xs text-mint-600 hover:text-mint-700 flex items-center gap-1">
                         <UserPlus size={12} /> Assign

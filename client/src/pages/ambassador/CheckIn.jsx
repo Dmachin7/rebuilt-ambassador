@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { shiftsAPI } from '../../api/index.js';
-import { getCurrentLocation } from '../../stubs/gps.js';
 import { Card, Button, Badge, Spinner } from '../../components/ui/index.jsx';
 import { formatShortDate, formatDateTime } from '../../utils/formatters.js';
 import { Camera, MapPin, Package, CheckCircle, Clock } from 'lucide-react';
@@ -15,9 +14,7 @@ export default function CheckIn() {
   const [checking, setChecking] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [locationStatus, setLocationStatus] = useState('idle'); // idle | checking | ok | error
   const [done, setDone] = useState(false);
-  const [locationIssue, setLocationIssue] = useState(null); // { distanceFeet } | { gpsFailed, message } | null — offers a manual override
   const fileRef = useRef(null);
 
   const loadShifts = async () => {
@@ -39,48 +36,17 @@ export default function CheckIn() {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  const handleCheckin = async (targetShift, override = false) => {
+  const handleCheckin = async (targetShift) => {
     setChecking(true);
-    setLocationStatus('checking');
-
-    let gps = null;
-    try {
-      gps = await getCurrentLocation();
-      setLocationStatus('ok');
-    } catch (err) {
-      setLocationStatus('error');
-      // GPS itself failed (permission denied, unavailable, timeout, unsupported browser). If this
-      // isn't already an override attempt, offer one instead of dead-ending on an alert — the
-      // ambassador may well be on-site with a phone that just can't get a location fix.
-      if (!override) {
-        setLocationIssue({ gpsFailed: true, message: err.message });
-        setChecking(false);
-        return;
-      }
-    }
-
     try {
       const formData = new FormData();
       if (photo) formData.append('photo', photo);
-      if (gps) {
-        formData.append('lat', gps.lat);
-        formData.append('lng', gps.lng);
-        if (gps.accuracy != null) formData.append('accuracy', gps.accuracy);
-      }
-      if (override) formData.append('locationOverride', 'true');
 
       await shiftsAPI.checkin(targetShift.id, formData);
-      setLocationIssue(null);
       setDone(true);
       setTimeout(() => navigate('/shifts'), 2000);
     } catch (err) {
-      setLocationStatus('error');
-      if (err.distanceFeet !== undefined && !override) {
-        setLocationIssue({ distanceFeet: err.distanceFeet });
-      } else {
-        setLocationIssue(null);
-        alert('Check-in failed: ' + err.message);
-      }
+      alert('Check-in failed: ' + err.message);
     } finally {
       setChecking(false);
     }
@@ -135,7 +101,7 @@ export default function CheckIn() {
         <h1 className="text-xl font-bold text-slate-800">Check In</h1>
         <p className="text-sm text-slate-500">Select a shift to check in to:</p>
         {assignedShifts.map((s) => (
-          <Card key={s.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setShift(s); setLocationIssue(null); }}>
+          <Card key={s.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShift(s)}>
             <div className="font-medium text-slate-800">{s.event.title}</div>
             <div className="text-xs text-slate-500 mt-1">{formatShortDate(s.event.date)}</div>
           </Card>
@@ -177,42 +143,6 @@ export default function CheckIn() {
           )}
         </div>
       </Card>
-
-      {/* GPS status */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-700">📍 Location Check</p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {locationStatus === 'idle' && 'Will verify when you check in'}
-              {locationStatus === 'checking' && 'Verifying location...'}
-              {locationStatus === 'ok' && '✅ Location verified — you are within range'}
-              {locationStatus === 'error' && '❌ Location check failed'}
-            </p>
-          </div>
-          <div className={`w-3 h-3 rounded-full ${locationStatus === 'ok' ? 'bg-green-400' : locationStatus === 'error' ? 'bg-red-400' : 'bg-slate-200'}`} />
-        </div>
-        <p className="text-xs text-slate-400 mt-2">Must be within 1000ft of the event location to check in.</p>
-      </Card>
-
-      {/* Location override — shown when the geofence check fails, or when GPS itself couldn't get a fix at all */}
-      {locationIssue && (
-        <Card className="p-4 border-orange-200 bg-orange-50">
-          <p className="text-sm text-orange-700">
-            {locationIssue.gpsFailed
-              ? `We couldn't get a location fix (${locationIssue.message}). If you're at the event, you can check in anyway.`
-              : `You appear to be about ${locationIssue.distanceFeet}ft from the event location. If you're at the right place and your phone's GPS is having trouble, you can check in anyway.`}
-          </p>
-          <Button
-            onClick={() => handleCheckin(targetShift, true)}
-            disabled={checking}
-            variant="secondary"
-            className="w-full mt-3"
-          >
-            {checking ? 'Checking in...' : 'Check In Anyway'}
-          </Button>
-        </Card>
-      )}
 
       {/* Photo upload — only for check-in */}
       {!isCheckedIn && (

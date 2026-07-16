@@ -108,7 +108,7 @@ model Shift {
   checkinTime      DateTime?
   checkoutTime     DateTime?
   checkinPhotoUrl  String?
-  locationOverride Boolean     @default(false)
+  checkedInByAdmin Boolean     @default(false)
   reminder24hSent  Boolean     @default(false)
   reminder1hSent   Boolean     @default(false)
 

@@ -14,7 +14,7 @@ export default function AmbassadorAvailability() {
       <div>
         <h1 className="text-xl font-bold text-slate-800">My Availability</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Set your availability up to a month ahead — use the arrows to move between weeks and tap a day to mark it Open, Not Available, or Other.
+          Set your availability up to a month ahead — use the arrows to move between weeks, tap a day to mark it Open, Not Available, or Other, or use "Mark whole week" to set every day at once.
         </p>
       </div>
       <AvailabilityCalendar

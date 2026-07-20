@@ -36,7 +36,7 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayStr()));
-  const [selectedDate, setSelectedDate] = useState(null); // date string of the day being edited
+  const [selectedDates, setSelectedDates] = useState(null); // date strings being edited: [day] or the whole in-range week
   const [status, setStatus] = useState('OPEN');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -65,22 +65,30 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
     const existing = days.find((d) => d.date.slice(0, 10) === dateStr);
     setStatus(existing?.status || 'OPEN');
     setNote(existing?.note || '');
-    setSelectedDate(dateStr);
+    setSelectedDates([dateStr]);
   };
 
-  const closeModal = () => setSelectedDate(null);
+  const handleWeekClick = () => {
+    const inRangeDays = weekDays.filter(isInRange);
+    if (!editable || inRangeDays.length === 0) return;
+    setStatus('OPEN');
+    setNote('');
+    setSelectedDates(inRangeDays);
+  };
+
+  const closeModal = () => setSelectedDates(null);
 
   const handleSaveDay = async () => {
-    if (!selectedDate) return;
+    if (!selectedDates || selectedDates.length === 0) return;
     setSaving(true);
     try {
-      const payload = [{ date: selectedDate, status, note: status === 'OTHER' ? note : null }];
+      const payload = selectedDates.map((date) => ({ date, status, note: status === 'OTHER' ? note : null }));
       await onSave(payload);
       setDays((prev) => [
-        ...prev.filter((d) => d.date.slice(0, 10) !== selectedDate),
-        { date: selectedDate, status, note: status === 'OTHER' ? note : null },
+        ...prev.filter((d) => !selectedDates.includes(d.date.slice(0, 10))),
+        ...payload,
       ]);
-      setSelectedDate(null);
+      setSelectedDates(null);
     } catch (err) {
       alert('Failed to save availability: ' + err.message);
     } finally {
@@ -89,9 +97,11 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
   };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const selectionLabel = selectedDate
-    ? new Date(`${selectedDate}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
-    : '';
+  const selectionLabel = !selectedDates
+    ? ''
+    : selectedDates.length === 1
+    ? new Date(`${selectedDates[0]}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    : `Whole week — ${formatShort(selectedDates[0])} – ${formatShort(selectedDates[selectedDates.length - 1])} (${selectedDates.length} days)`;
 
   return (
     <div className="space-y-3">
@@ -138,6 +148,17 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
           </Button>
         </div>
 
+        {editable && (
+          <button
+            type="button"
+            onClick={handleWeekClick}
+            disabled={weekDays.filter(isInRange).length === 0}
+            className="w-full mb-3 text-xs font-medium text-mint-700 border border-mint-300 bg-mint-50 hover:bg-mint-100 rounded-lg py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Mark whole week
+          </button>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
           {weekDays.map((dateStr) => {
             const day = days.find((d) => d.date.slice(0, 10) === dateStr);
@@ -174,7 +195,7 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
         </div>
       </Card>
 
-      <Modal isOpen={!!selectedDate} onClose={closeModal} title={selectionLabel}>
+      <Modal isOpen={!!selectedDates} onClose={closeModal} title={selectionLabel}>
         <div className="space-y-4">
           <div className="space-y-2">
             {STATUS_OPTIONS.map((opt) => (

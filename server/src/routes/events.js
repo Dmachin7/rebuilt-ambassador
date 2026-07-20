@@ -214,6 +214,33 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
 
     const event = await prisma.event.update({ where: { id: req.params.id }, data });
 
+    // ambassadorsNeeded on its own is just a number on the Event row — reconcile the actual
+    // Shift rows so raising it creates a real open slot to assign, and lowering it removes
+    // unfilled slots (assigned shifts are never auto-removed).
+    if (data.ambassadorsNeeded !== undefined) {
+      const currentShifts = await prisma.shift.findMany({ where: { eventId: event.id } });
+      const diff = data.ambassadorsNeeded - currentShifts.length;
+
+      if (diff > 0) {
+        await Promise.all(
+          Array.from({ length: diff }, () =>
+            prisma.shift.create({ data: { eventId: event.id, status: 'OPEN' } })
+          )
+        );
+
+        const ambassadors = await prisma.user.findMany({ where: { role: 'AMBASSADOR' }, select: { email: true } });
+        const emails = ambassadors.map((u) => u.email);
+        if (emails.length > 0) {
+          sendNewOpenEventEmail(emails, event, diff).catch((err) => console.error('[NEW EVENT EMAIL]', err));
+        }
+      } else if (diff < 0) {
+        const removable = currentShifts.filter((s) => s.status === 'OPEN' && !s.ambassadorId).slice(0, -diff);
+        if (removable.length > 0) {
+          await prisma.shift.deleteMany({ where: { id: { in: removable.map((s) => s.id) } } });
+        }
+      }
+    }
+
     if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {
       const fullEvent = await prisma.event.findUnique({
         where: { id: event.id },

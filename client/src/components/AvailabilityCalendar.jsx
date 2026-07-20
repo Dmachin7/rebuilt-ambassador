@@ -1,51 +1,48 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
 import { availabilityAPI } from '../api/index.js';
 import { Card, Button, Modal, Textarea, Spinner } from './ui/index.jsx';
 
 const STATUS_OPTIONS = [
-  { value: 'OPEN', label: 'Open', color: '#4ade80', textColor: '#14532d' },
-  { value: 'UNAVAILABLE', label: 'Not Available', color: '#f87171', textColor: '#7f1d1d' },
-  { value: 'OTHER', label: 'Other', color: '#fbbf24', textColor: '#78350f' },
+  { value: 'OPEN', label: 'Open', dot: 'bg-green-400', cell: 'bg-green-50 border-green-300 text-green-800' },
+  { value: 'UNAVAILABLE', label: 'Not Available', dot: 'bg-red-400', cell: 'bg-red-50 border-red-300 text-red-800' },
+  { value: 'OTHER', label: 'Other', dot: 'bg-amber-400', cell: 'bg-amber-50 border-amber-300 text-amber-800' },
 ];
 
-const colorFor = (status) => STATUS_OPTIONS.find((s) => s.value === status)?.color || '#e2e8f0';
+const NOT_SET_CELL = 'bg-white border-slate-200 text-slate-400';
 
-// Enumerates local YYYY-MM-DD date strings in [startStr, endStr) — matches FullCalendar's
-// date-only select() range (endStr is exclusive, the day after the last selected cell).
-function enumerateDates(startStr, endStr) {
-  const dates = [];
-  let cur = new Date(`${startStr}T00:00:00Z`);
-  const end = new Date(`${endStr}T00:00:00Z`);
-  while (cur < end) {
-    dates.push(cur.toISOString().slice(0, 10));
-    cur = new Date(cur.getTime() + 86400000);
-  }
-  return dates;
-}
+const statusOption = (status) => STATUS_OPTIONS.find((s) => s.value === status);
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T00:00:00Z`);
   return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10);
 };
 
-// Shared month calendar for setting/viewing day-by-day ambassador availability. Used both by the
-// ambassador's own "My Availability" page and the admin/EC availability page (via `editable` +
+const startOfWeek = (dateStr) => addDays(dateStr, -new Date(`${dateStr}T00:00:00Z`).getUTCDay());
+
+const formatShort = (dateStr) =>
+  new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+// Shared week-by-week calendar for setting/viewing day-by-day ambassador availability. Used both by
+// the ambassador's own "My Availability" page and the admin/EC availability page (via `editable` +
 // `onSave`, which differ because ambassadors PUT /availability (self) while admin/EC PUT
 // /availability/:userId).
+//
+// Shows one week at a time with a single tap-to-open-modal per day, rather than a full month grid
+// with click-and-drag range selection — on mobile, drag-select had no tap-vs-drag threshold, so a
+// finger tap on a narrow day cell was easily misread as a drag across the whole week row.
 export default function AvailabilityCalendar({ userId, editable = true, validRange, onSave }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState(null); // { start, end } currently visible, ISO date strings
-  const [selection, setSelection] = useState(null); // { startStr, endStr } pending edit
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(todayStr()));
+  const [selectedDate, setSelectedDate] = useState(null); // date string of the day being edited
   const [status, setStatus] = useState('OPEN');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = useCallback((start, end) => {
-    if (!userId || !start || !end) return;
+    if (!userId) return;
     setLoading(true);
     availabilityAPI.get(userId, start, end)
       .then(setDays)
@@ -53,39 +50,37 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
   }, [userId]);
 
   useEffect(() => {
-    if (range) load(range.start, range.end);
-  }, [userId, range, load]);
+    load(weekStart, addDays(weekStart, 6));
+  }, [userId, weekStart, load]);
 
-  const handleDatesSet = (info) => {
-    setRange({ start: info.startStr.slice(0, 10), end: info.endStr.slice(0, 10) });
-  };
+  const isInRange = (dateStr) =>
+    (!validRange?.start || dateStr >= validRange.start) && (!validRange?.end || dateStr <= validRange.end);
 
-  const handleSelect = (info) => {
-    if (!editable) return;
-    const startStr = info.startStr.slice(0, 10);
-    const endStr = info.endStr.slice(0, 10);
-    const existing = days.find((d) => d.date.slice(0, 10) === startStr);
+  const prevDisabled = !!validRange?.start && addDays(weekStart, -1) < validRange.start;
+  const nextDisabled = !!validRange?.end && addDays(weekStart, 7) > validRange.end;
+  const isCurrentWeek = weekStart === startOfWeek(todayStr());
+
+  const handleDayClick = (dateStr) => {
+    if (!editable || !isInRange(dateStr)) return;
+    const existing = days.find((d) => d.date.slice(0, 10) === dateStr);
     setStatus(existing?.status || 'OPEN');
     setNote(existing?.note || '');
-    setSelection({ startStr, endStr });
+    setSelectedDate(dateStr);
   };
 
-  const closeModal = () => setSelection(null);
+  const closeModal = () => setSelectedDate(null);
 
   const handleSaveDay = async () => {
-    if (!selection) return;
+    if (!selectedDate) return;
     setSaving(true);
     try {
-      const dates = enumerateDates(selection.startStr, selection.endStr);
-      const payload = dates.map((date) => ({ date, status, note: status === 'OTHER' ? note : null }));
+      const payload = [{ date: selectedDate, status, note: status === 'OTHER' ? note : null }];
       await onSave(payload);
-      // Merge locally so the calendar reflects the change without waiting on a refetch
-      setDays((prev) => {
-        const kept = prev.filter((d) => !dates.includes(d.date.slice(0, 10)));
-        const added = dates.map((date) => ({ date, status, note: status === 'OTHER' ? note : null }));
-        return [...kept, ...added];
-      });
-      setSelection(null);
+      setDays((prev) => [
+        ...prev.filter((d) => d.date.slice(0, 10) !== selectedDate),
+        { date: selectedDate, status, note: status === 'OTHER' ? note : null },
+      ]);
+      setSelectedDate(null);
     } catch (err) {
       alert('Failed to save availability: ' + err.message);
     } finally {
@@ -93,20 +88,9 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
     }
   };
 
-  const backgroundEvents = days.map((d) => {
-    const dateStr = d.date.slice(0, 10);
-    return {
-      start: dateStr,
-      end: addDays(dateStr, 1),
-      display: 'background',
-      backgroundColor: colorFor(d.status),
-    };
-  });
-
-  const selectionLabel = selection
-    ? selection.startStr === addDays(selection.endStr, -1)
-      ? new Date(`${selection.startStr}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
-      : `${selection.startStr} – ${addDays(selection.endStr, -1)}`
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const selectionLabel = selectedDate
+    ? new Date(`${selectedDate}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
     : '';
 
   return (
@@ -114,7 +98,7 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
       <div className="flex flex-wrap gap-3 text-xs">
         {STATUS_OPTIONS.map((s) => (
           <div key={s.value} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
+            <div className={`w-3 h-3 rounded-full ${s.dot}`} />
             <span className="text-slate-600">{s.label}</span>
           </div>
         ))}
@@ -124,26 +108,73 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
         </div>
       </div>
 
-      <Card className="p-2 overflow-hidden relative">
+      <Card className="p-3 relative">
         {loading && (
-          <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10 rounded-xl">
             <Spinner className="w-6 h-6" />
           </div>
         )}
-        <FullCalendar
-          plugins={[dayGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-          validRange={validRange}
-          selectable={editable}
-          select={handleSelect}
-          datesSet={handleDatesSet}
-          events={backgroundEvents}
-          height="auto"
-        />
+
+        <div className="flex items-center justify-between mb-3">
+          <Button variant="secondary" size="sm" onClick={() => setWeekStart((w) => addDays(w, -7))} disabled={prevDisabled}>
+            ‹ Prev
+          </Button>
+          <div className="text-center">
+            <div className="text-sm font-semibold text-slate-700">
+              {formatShort(weekStart)} – {formatShort(addDays(weekStart, 6))}
+            </div>
+            {!isCurrentWeek && (
+              <button
+                type="button"
+                onClick={() => setWeekStart(startOfWeek(todayStr()))}
+                className="text-xs text-mint-600 hover:underline"
+              >
+                Jump to this week
+              </button>
+            )}
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setWeekStart((w) => addDays(w, 7))} disabled={nextDisabled}>
+            Next ›
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
+          {weekDays.map((dateStr) => {
+            const day = days.find((d) => d.date.slice(0, 10) === dateStr);
+            const opt = statusOption(day?.status);
+            const disabled = !editable || !isInRange(dateStr);
+            const isToday = dateStr === todayStr();
+            return (
+              <button
+                key={dateStr}
+                type="button"
+                disabled={disabled}
+                onClick={() => handleDayClick(dateStr)}
+                className={`flex items-center justify-between sm:flex-col sm:justify-center sm:text-center gap-1 rounded-lg border px-3 py-3 text-left transition-colors ${
+                  opt ? opt.cell : NOT_SET_CELL
+                } ${isToday ? 'ring-2 ring-mint-400' : ''} ${
+                  disabled ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-95 cursor-pointer'
+                }`}
+              >
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide opacity-70">
+                    {new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}
+                  </div>
+                  <div className="text-base font-semibold">
+                    {new Date(`${dateStr}T00:00:00Z`).getUTCDate()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-medium sm:justify-center">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt ? opt.dot : 'bg-slate-200'}`} />
+                  <span className="sm:hidden">{opt ? opt.label : 'Not set'}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </Card>
 
-      <Modal isOpen={!!selection} onClose={closeModal} title={selectionLabel}>
+      <Modal isOpen={!!selectedDate} onClose={closeModal} title={selectionLabel}>
         <div className="space-y-4">
           <div className="space-y-2">
             {STATUS_OPTIONS.map((opt) => (
@@ -160,7 +191,7 @@ export default function AvailabilityCalendar({ userId, editable = true, validRan
                   onChange={() => setStatus(opt.value)}
                   className="accent-mint-600"
                 />
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                <div className={`w-3 h-3 rounded-full shrink-0 ${opt.dot}`} />
                 <span className="text-sm text-slate-700">{opt.label}</span>
               </label>
             ))}

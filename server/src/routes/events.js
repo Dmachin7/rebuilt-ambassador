@@ -107,7 +107,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         contactEmail,
         date: new Date(date),
         endTime: endTime ? new Date(endTime) : null,
-        setupTimeMins: parseInt(setupTimeMins) || 30,
+        setupTimeMins: parseInt(setupTimeMins) || 15,
         breakdownTimeMins: parseInt(breakdownTimeMins) || 30,
         ambassadorsNeeded: totalNeeded,
         samplesNeeded: samplesNeeded ? parseInt(samplesNeeded) : null,

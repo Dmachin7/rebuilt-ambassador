@@ -82,7 +82,7 @@ model Event {
   contactEmail      String?
   date              DateTime
   endTime           DateTime?
-  setupTimeMins     Int         @default(30)
+  setupTimeMins     Int         @default(15)
   breakdownTimeMins Int         @default(30)
   payRate           Float       @default(20.0)
   ambassadorsNeeded Int         @default(1)

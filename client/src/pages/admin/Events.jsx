@@ -43,7 +43,7 @@ const PICKUP_LOCATIONS = [
 const EMPTY_FORM = {
   title: '', location: '', pickupLocation: '', contactName: '', contactPhone: '', contactEmail: '',
   startDate: '', startTime: '', endDate: '', endTime: '',
-  setupTimeMins: 30, ambassadorsNeeded: 1,
+  setupTimeMins: 15, ambassadorsNeeded: 1,
   samplesNeeded: '', snackBitesNeeded: '', notes: '',
   assignedAmbassadorIds: [],
 };

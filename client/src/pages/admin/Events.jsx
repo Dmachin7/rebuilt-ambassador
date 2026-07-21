@@ -167,6 +167,33 @@ export default function AdminEvents() {
 
   useEffect(() => { setLoading(true); load(); }, [filter]);
 
+  // Restore scroll position when returning from an event's detail page, so backing out of an event
+  // doesn't dump the admin back at the top of a long list. Only on the first load after mount —
+  // later reloads (e.g. from changing the filter) should start at the top like a fresh list.
+  const restoredScrollRef = useRef(false);
+  useEffect(() => {
+    if (loading || restoredScrollRef.current) return;
+    restoredScrollRef.current = true;
+    const saved = sessionStorage.getItem('adminEventsScrollY');
+    if (saved) requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+  }, [loading]);
+
+  // Track scroll position continuously (rather than saving on unmount) so it survives regardless of
+  // when/how navigation away happens.
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        sessionStorage.setItem('adminEventsScrollY', String(window.scrollY));
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const openCreate = () => {
     setEditingEvent(null);
     setForm(EMPTY_FORM);

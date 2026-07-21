@@ -2,26 +2,26 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { availabilityAPI } from '../api/index.js';
 import { Card, Button, Modal, Textarea, Spinner } from './ui/index.jsx';
 
-const STATUS_OPTIONS = [
+export const STATUS_OPTIONS = [
   { value: 'OPEN', label: 'Open', dot: 'bg-green-400', cell: 'bg-green-50 border-green-300 text-green-800' },
   { value: 'UNAVAILABLE', label: 'Not Available', dot: 'bg-red-400', cell: 'bg-red-50 border-red-300 text-red-800' },
   { value: 'OTHER', label: 'Other', dot: 'bg-amber-400', cell: 'bg-amber-50 border-amber-300 text-amber-800' },
 ];
 
-const NOT_SET_CELL = 'bg-white border-slate-200 text-slate-400';
+export const NOT_SET_CELL = 'bg-white border-slate-200 text-slate-400';
 
-const statusOption = (status) => STATUS_OPTIONS.find((s) => s.value === status);
+export const statusOption = (status) => STATUS_OPTIONS.find((s) => s.value === status);
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+export const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const addDays = (dateStr, n) => {
+export const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T00:00:00Z`);
   return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10);
 };
 
-const startOfWeek = (dateStr) => addDays(dateStr, -new Date(`${dateStr}T00:00:00Z`).getUTCDay());
+export const startOfWeek = (dateStr) => addDays(dateStr, -new Date(`${dateStr}T00:00:00Z`).getUTCDay());
 
-const formatShort = (dateStr) =>
+export const formatShort = (dateStr) =>
   new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 // Shared week-by-week calendar for setting/viewing day-by-day ambassador availability. Used both by

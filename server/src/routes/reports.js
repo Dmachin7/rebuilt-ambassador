@@ -104,7 +104,7 @@ router.post('/', verifyToken, async (req, res) => {
         shift.ambassadorId
           ? prisma.user.findUnique({ where: { id: shift.ambassadorId }, select: { firstName: true, lastName: true } })
           : null,
-        prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } }),
+        prisma.user.findMany({ where: { role: 'ADMIN', notifySalesReports: true }, select: { email: true } }),
       ]);
       const adminEmails = admins.map((u) => u.email);
       if (adminEmails.length > 0) {

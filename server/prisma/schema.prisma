@@ -57,6 +57,17 @@ model User {
   address        String?
   ssnPlaceholder String?
 
+  // Admin/EC operational email preferences — which notification categories this person
+  // gets emailed about. Irrelevant for AMBASSADOR accounts (they don't receive these).
+  notifyShiftClaims   Boolean @default(true)
+  notifyCheckIns      Boolean @default(true)
+  notifyCheckOuts     Boolean @default(true)
+  notifySalesReports  Boolean @default(true)
+  notifyMessages      Boolean @default(true)
+  notifyEventRecaps   Boolean @default(true)
+  notifyDailySummary  Boolean @default(true)
+  notifyWeeklySummary Boolean @default(true)
+
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
 
@@ -89,6 +100,8 @@ model Event {
   samplesNeeded     Int?
   snackBitesNeeded  Int?
   notes             String?
+  hasImportantNotes Boolean     @default(false)
+  tentNeeded        Boolean     @default(false)
   status            EventStatus @default(UPCOMING)
   totalMealsSold    Int?
   totalSalesInput   Int?

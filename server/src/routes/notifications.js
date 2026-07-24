@@ -22,7 +22,7 @@ router.post('/daily', verifyToken, requireRole('ADMIN'), async (req, res) => {
         where: { submittedAt: { gte: startOfDay, lte: endOfDay } },
         _sum: { mealsSold: true },
       }),
-      prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } }),
+      prisma.user.findMany({ where: { role: 'ADMIN', notifyDailySummary: true }, select: { email: true } }),
     ]);
 
     const totalHours = completedShifts.reduce((s, sh) => s + (sh.payment?.hoursWorked || 0), 0);
@@ -58,7 +58,7 @@ router.post('/weekly', verifyToken, requireRole('ADMIN'), async (req, res) => {
         where: { submittedAt: { gte: weekStart, lte: weekEnd } },
         _sum: { mealsSold: true, totalSales: true },
       }),
-      prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } }),
+      prisma.user.findMany({ where: { role: 'ADMIN', notifyWeeklySummary: true }, select: { email: true } }),
     ]);
 
     const totalHours = completedShifts.reduce((s, sh) => s + (sh.payment?.hoursWorked || 0), 0);

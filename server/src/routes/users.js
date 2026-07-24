@@ -40,6 +40,9 @@ router.get('/:id', verifyToken, async (req, res) => {
         id: true, email: true, role: true, firstName: true, lastName: true,
         phone: true, legalName: true, address: true, isAvailable: true,
         lifetimeSalesCount: true, createdAt: true,
+        notifyShiftClaims: true, notifyCheckIns: true, notifyCheckOuts: true,
+        notifySalesReports: true, notifyMessages: true, notifyEventRecaps: true,
+        notifyDailySummary: true, notifyWeeklySummary: true,
       },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -64,8 +67,25 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (legalName !== undefined) data.legalName = legalName;
     if (address !== undefined) data.address = address;
 
+    // Notification preferences are personal — only editable on your own account, even for admins.
+    if (req.user.id === req.params.id) {
+      const NOTIFY_FIELDS = [
+        'notifyShiftClaims', 'notifyCheckIns', 'notifyCheckOuts', 'notifySalesReports',
+        'notifyMessages', 'notifyEventRecaps', 'notifyDailySummary', 'notifyWeeklySummary',
+      ];
+      for (const key of NOTIFY_FIELDS) {
+        if (typeof req.body[key] === 'boolean') data[key] = req.body[key];
+      }
+    }
+
     const user = await prisma.user.update({ where: { id: req.params.id }, data });
-    res.json({ id: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName });
+    res.json({
+      id: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName,
+      notifyShiftClaims: user.notifyShiftClaims, notifyCheckIns: user.notifyCheckIns,
+      notifyCheckOuts: user.notifyCheckOuts, notifySalesReports: user.notifySalesReports,
+      notifyMessages: user.notifyMessages, notifyEventRecaps: user.notifyEventRecaps,
+      notifyDailySummary: user.notifyDailySummary, notifyWeeklySummary: user.notifyWeeklySummary,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

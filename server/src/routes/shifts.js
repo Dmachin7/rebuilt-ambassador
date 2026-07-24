@@ -113,7 +113,10 @@ router.post('/:id/claim', verifyToken, requireRole('AMBASSADOR'), async (req, re
     if (ambassador) {
       sendShiftAssignedEmail(ambassador, shift.event, false).catch((err) => console.error('[SHIFT EMAIL]', err));
 
-      prisma.user.findMany({ where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } }, select: { email: true } })
+      prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] }, notifyShiftClaims: true },
+        select: { email: true },
+      })
         .then((staff) => {
           const emails = staff.map((u) => u.email);
           if (emails.length > 0) {
@@ -187,7 +190,10 @@ router.post('/:id/unassign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATO
     });
 
     if (before?.ambassador && before?.event) {
-      prisma.user.findMany({ where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } }, select: { email: true } })
+      prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] }, notifyShiftClaims: true },
+        select: { email: true },
+      })
         .then((staff) => {
           const emails = staff.map((u) => u.email);
           if (emails.length > 0) {
@@ -233,7 +239,7 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
       },
     });
 
-    prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+    prisma.user.findMany({ where: { role: 'ADMIN', notifyCheckIns: true }, select: { email: true } })
       .then(async (admins) => {
         const adminEmails = admins.map((u) => u.email);
         if (adminEmails.length === 0) return;
@@ -287,7 +293,7 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
       });
     }
 
-    prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+    prisma.user.findMany({ where: { role: 'ADMIN', notifyCheckOuts: true }, select: { email: true } })
       .then(async (admins) => {
         const adminEmails = admins.map((u) => u.email);
         if (adminEmails.length === 0) return;

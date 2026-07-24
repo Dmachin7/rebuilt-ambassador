@@ -52,7 +52,7 @@ router.post('/:eventId', verifyToken, async (req, res) => {
     // Fire-and-forget: email all participants except the sender
     Promise.all([
       prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } },
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] }, notifyMessages: true },
         select: { id: true, email: true },
       }),
       prisma.shift.findMany({

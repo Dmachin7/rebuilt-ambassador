@@ -7,6 +7,9 @@ const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail }
 
 const router = express.Router();
 
+// Snack bites are only ever handed out in bags of 10 — round whatever comes in to the nearest 10.
+const roundToTen = (n) => Math.round(n / 10) * 10;
+
 // Event.status is otherwise only ever set manually (e.g. CANCELLED via the API) — without this,
 // past events sit at their UPCOMING default forever. Flips events to COMPLETED once they're over.
 async function syncCompletedEvents() {
@@ -80,7 +83,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
-      milesFromHq, driveTimeMins,
+      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
     } = req.body;
 
     if (!title || !location || !date) {
@@ -111,8 +114,10 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         breakdownTimeMins: parseInt(breakdownTimeMins) || 30,
         ambassadorsNeeded: totalNeeded,
         samplesNeeded: samplesNeeded ? parseInt(samplesNeeded) : null,
-        snackBitesNeeded: snackBitesNeeded ? parseInt(snackBitesNeeded) : null,
+        snackBitesNeeded: snackBitesNeeded ? roundToTen(parseInt(snackBitesNeeded)) : null,
         notes,
+        hasImportantNotes: !!hasImportantNotes,
+        tentNeeded: !!tentNeeded,
         status: 'UPCOMING',
       },
     });
@@ -174,7 +179,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, status,
-      milesFromHq, driveTimeMins,
+      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
     } = req.body;
 
     const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true } });
@@ -208,8 +213,10 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (breakdownTimeMins !== undefined) data.breakdownTimeMins = parseInt(breakdownTimeMins);
     if (ambassadorsNeeded !== undefined) data.ambassadorsNeeded = parseInt(ambassadorsNeeded);
     if (samplesNeeded !== undefined) data.samplesNeeded = samplesNeeded ? parseInt(samplesNeeded) : null;
-    if (snackBitesNeeded !== undefined) data.snackBitesNeeded = snackBitesNeeded ? parseInt(snackBitesNeeded) : null;
+    if (snackBitesNeeded !== undefined) data.snackBitesNeeded = snackBitesNeeded ? roundToTen(parseInt(snackBitesNeeded)) : null;
     if (notes !== undefined) data.notes = notes;
+    if (hasImportantNotes !== undefined) data.hasImportantNotes = !!hasImportantNotes;
+    if (tentNeeded !== undefined) data.tentNeeded = !!tentNeeded;
     if (status !== undefined) data.status = status;
 
     const event = await prisma.event.update({ where: { id: req.params.id }, data });
@@ -249,7 +256,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
         },
       });
       const staff = await prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] } },
+        where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] }, notifyEventRecaps: true },
         select: { email: true },
       });
       const staffEmails = staff.map((u) => u.email);

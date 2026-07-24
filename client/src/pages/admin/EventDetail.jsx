@@ -157,8 +157,18 @@ export default function EventDetail() {
         </Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-slate-800">{event.title}</h1>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <Badge status={event.status} />
+            {event.hasImportantNotes && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                ⚠️ Important Notes
+              </span>
+            )}
+            {event.tentNeeded && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                ⛺ Tent Needed
+              </span>
+            )}
             {event.milesFromHq && (
               <span className="text-xs text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive (round-trip)</span>
             )}

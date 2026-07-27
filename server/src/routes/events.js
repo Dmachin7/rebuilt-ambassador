@@ -37,6 +37,7 @@ router.get('/', verifyToken, async (req, res) => {
             ambassador: { select: { id: true, firstName: true, lastName: true, email: true } },
           },
         },
+        baggedBy: { select: { id: true, firstName: true, lastName: true } },
         _count: { select: { shifts: true, messages: true } },
       },
       orderBy: { date: 'asc' },
@@ -66,6 +67,7 @@ router.get('/:id', verifyToken, async (req, res) => {
           include: { sender: { select: { id: true, firstName: true, lastName: true, role: true } } },
           orderBy: { createdAt: 'asc' },
         },
+        baggedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
     if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -84,6 +86,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
       milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
+      baggedAndSent, baggedByUserId,
     } = req.body;
 
     if (!title || !location || !date) {
@@ -118,6 +121,8 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         notes,
         hasImportantNotes: !!hasImportantNotes,
         tentNeeded: !!tentNeeded,
+        baggedAndSent: !!baggedAndSent,
+        baggedByUserId: baggedByUserId || null,
         status: 'UPCOMING',
       },
     });
@@ -180,6 +185,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, snackBitesNeeded, notes, status,
       milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
+      baggedAndSent, baggedByUserId,
     } = req.body;
 
     const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true } });
@@ -217,9 +223,15 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (notes !== undefined) data.notes = notes;
     if (hasImportantNotes !== undefined) data.hasImportantNotes = !!hasImportantNotes;
     if (tentNeeded !== undefined) data.tentNeeded = !!tentNeeded;
+    if (baggedAndSent !== undefined) data.baggedAndSent = !!baggedAndSent;
+    if (baggedByUserId !== undefined) data.baggedByUserId = baggedByUserId || null;
     if (status !== undefined) data.status = status;
 
-    const event = await prisma.event.update({ where: { id: req.params.id }, data });
+    const event = await prisma.event.update({
+      where: { id: req.params.id },
+      data,
+      include: { baggedBy: { select: { id: true, firstName: true, lastName: true } } },
+    });
 
     // ambassadorsNeeded on its own is just a number on the Event row — reconcile the actual
     // Shift rows so raising it creates a real open slot to assign, and lowering it removes

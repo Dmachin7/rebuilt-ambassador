@@ -126,3 +126,21 @@
 .fc-event {
   cursor: pointer;
 }
+
+/* Event Calendar — let the custom event card content wrap instead of being clipped/ellipsized,
+   so location/time/deliver-to/meals details are all visible at a glance. */
+.fc-daygrid-event-harness,
+.fc-timegrid-event-harness {
+  overflow: visible !important;
+}
+.fc-event-main,
+.fc-event-main-frame,
+.fc-event-title-container,
+.fc-event-title {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+.fc-daygrid-day-frame {
+  min-height: 100%;
+}

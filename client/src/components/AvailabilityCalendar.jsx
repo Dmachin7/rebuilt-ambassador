@@ -19,7 +19,10 @@ export const addDays = (dateStr, n) => {
   return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10);
 };
 
-export const startOfWeek = (dateStr) => addDays(dateStr, -new Date(`${dateStr}T00:00:00Z`).getUTCDay());
+export const startOfWeek = (dateStr) => {
+  const day = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 0=Sun..6=Sat
+  return addDays(dateStr, -((day + 6) % 7)); // offset back to Monday
+};
 
 export const formatShort = (dateStr) =>
   new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });

@@ -19,7 +19,12 @@ export const eventsAPI = {
 export const shiftsAPI = {
   list: () => api.get('/shifts'),
   listOpen: () => api.get('/shifts/open'),
-  hours: () => api.get('/shifts/hours'),
+  hours: (start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.get(`/shifts/hours${params.length ? `?${params.join('&')}` : ''}`);
+  },
   claim: (id) => api.post(`/shifts/${id}/claim`),
   assign: (id, ambassadorId) => api.post(`/shifts/${id}/assign`, { ambassadorId }),
   unassign: (id) => api.post(`/shifts/${id}/unassign`),

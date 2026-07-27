@@ -42,8 +42,16 @@ router.get('/open', verifyToken, async (req, res) => {
 // GET /api/shifts/hours
 router.get('/hours', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
+    const { start, end } = req.query;
+    const where = {};
+    if (start || end) {
+      where.shift = { event: { date: {} } };
+      if (start) where.shift.event.date.gte = new Date(start);
+      if (end) where.shift.event.date.lte = new Date(end);
+    }
     const groups = await prisma.payment.groupBy({
       by: ['ambassadorId'],
+      where,
       _sum: { hoursWorked: true, amount: true },
       _count: { id: true },
     });

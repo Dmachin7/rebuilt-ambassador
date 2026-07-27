@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { shiftsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Spinner } from '../../components/ui/index.jsx';
-import { formatShortDate, formatDateTime } from '../../utils/formatters.js';
+import { formatShortDate, formatDateTime, formatTime } from '../../utils/formatters.js';
 import { Camera, MapPin, Package, CheckCircle, Clock } from 'lucide-react';
 
 export default function CheckIn() {
@@ -15,6 +15,7 @@ export default function CheckIn() {
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [done, setDone] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const fileRef = useRef(null);
 
   const loadShifts = async () => {
@@ -28,6 +29,13 @@ export default function CheckIn() {
   };
 
   useEffect(() => { loadShifts(); }, [shiftId]);
+
+  // Ticks so the "too early" gate below lifts on its own once arrival time passes,
+  // without requiring the ambassador to refresh the page.
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
@@ -111,6 +119,8 @@ export default function CheckIn() {
   }
 
   const isCheckedIn = targetShift?.status === 'CHECKED_IN';
+  const arrivalTime = targetShift?.event?.arrivalTime ? new Date(targetShift.event.arrivalTime) : null;
+  const tooEarly = !isCheckedIn && arrivalTime && now < arrivalTime.getTime();
 
   return (
     <div className="px-4 py-5 space-y-5 max-w-lg mx-auto">
@@ -131,6 +141,9 @@ export default function CheckIn() {
             <div className="flex items-start gap-1.5"><Package size={12} className="mt-0.5 shrink-0" />Pickup: {targetShift.event.pickupLocation}</div>
           )}
           <div className="flex items-center gap-1.5"><Clock size={12} />{formatShortDate(targetShift?.event.date)}</div>
+          {!isCheckedIn && targetShift?.event.setupTimeMins > 0 && arrivalTime && (
+            <div className="text-orange-600 font-medium">Arrive by {formatTime(arrivalTime)} ({targetShift.event.setupTimeMins}min setup)</div>
+          )}
           {isCheckedIn && targetShift?.checkinTime && (
             <div className="text-green-600 font-medium">Checked in at {formatDateTime(targetShift.checkinTime)}</div>
           )}
@@ -175,13 +188,20 @@ export default function CheckIn() {
           {checking ? 'Checking out...' : '🏁 Check Out — End Shift'}
         </Button>
       ) : (
-        <Button
-          onClick={() => handleCheckin(targetShift)}
-          disabled={checking}
-          className="w-full py-4 text-base"
-        >
-          {checking ? 'Checking in...' : '✅ Check In — Start Shift'}
-        </Button>
+        <>
+          {tooEarly && (
+            <p className="text-center text-xs text-amber-600 -mt-2">
+              Check-in opens at {formatTime(arrivalTime)}
+            </p>
+          )}
+          <Button
+            onClick={() => handleCheckin(targetShift)}
+            disabled={checking || tooEarly}
+            className="w-full py-4 text-base"
+          >
+            {checking ? 'Checking in...' : tooEarly ? `Opens at ${formatTime(arrivalTime)}` : '✅ Check In — Start Shift'}
+          </Button>
+        </>
       )}
     </div>
   );

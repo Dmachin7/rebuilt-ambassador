@@ -6,7 +6,7 @@ const { requireRole } = require('../middleware/rbac');
 const { sendSMSReminder } = require('../stubs/sms');
 const { uploadPhoto } = require('../stubs/storage');
 const { sendShiftAssignedEmail, sendShiftPickupEmail, sendCheckInNotificationEmail, sendCheckoutNotificationEmail } = require('../services/emailService');
-const { withShiftArrivalTime } = require('../lib/time');
+const { withShiftArrivalTime, computeArrivalTime } = require('../lib/time');
 const { MIN_PAID_HOURS, HOURLY_RATE } = require('../config/constants');
 
 const router = express.Router();
@@ -230,6 +230,16 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
       return res.status(403).json({ error: 'Not your shift' });
     }
     if (shift.checkinTime) return res.status(400).json({ error: 'Already checked in' });
+
+    // Ambassadors can only check in once their arrival time hits (event start minus
+    // setupTimeMins, same value shown to them as "Arrive by") — admins are exempt so
+    // they can always check someone in manually.
+    if (req.user.role !== 'ADMIN') {
+      const arrivalTime = new Date(computeArrivalTime(shift.event));
+      if (new Date() < arrivalTime) {
+        return res.status(400).json({ error: "Check-in isn't open yet — please wait until closer to the event start time." });
+      }
+    }
 
     const photoResult = req.file ? await uploadPhoto(req.file) : { url: null };
 

@@ -1,0 +1,81 @@
+const express = require('express');
+const prisma = require('../lib/prisma');
+const { verifyToken } = require('../middleware/auth');
+const { requireRole } = require('../middleware/rbac');
+
+const router = express.Router();
+
+// Monday-start week bucket for a date, matching the Monday-Sunday convention used across the
+// Calendar and Availability pages.
+function startOfWeekMonday(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  const diffToMonday = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - diffToMonday);
+  return date;
+}
+
+async function weeklyProjections() {
+  const events = await prisma.event.findMany({
+    where: {
+      status: { in: ['UPCOMING', 'ACTIVE'] },
+      OR: [{ samplesNeeded: { gt: 0 } }, { snackBitesNeeded: { gt: 0 } }],
+    },
+    select: { date: true, samplesNeeded: true, snackBitesNeeded: true },
+    orderBy: { date: 'asc' },
+  });
+
+  const byWeek = new Map(); // weekStart ISO -> { weekStart, weekEnd, totalMeals, totalSnackBites, eventCount }
+  events.forEach((e) => {
+    const weekStart = startOfWeekMonday(e.date);
+    const key = weekStart.toISOString();
+    if (!byWeek.has(key)) {
+      const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
+      byWeek.set(key, { weekStart, weekEnd, totalMeals: 0, totalSnackBites: 0, eventCount: 0 });
+    }
+    const bucket = byWeek.get(key);
+    bucket.totalMeals += e.samplesNeeded || 0;
+    bucket.totalSnackBites += e.snackBitesNeeded || 0;
+    bucket.eventCount += 1;
+  });
+
+  return Array.from(byWeek.values()).sort((a, b) => a.weekStart - b.weekStart);
+}
+
+// GET /api/exports/projections — weekly meals/snack-bites needed across upcoming events
+router.get('/projections', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const weeks = await weeklyProjections();
+    res.json(weeks);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/exports/projections/csv
+router.get('/projections/csv', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const weeks = await weeklyProjections();
+    const headers = ['Week Start', 'Week End', 'Total Meals', 'Total Snack Bites', 'Events'];
+    const rows = weeks.map((w) => [
+      w.weekStart.toISOString().split('T')[0],
+      w.weekEnd.toISOString().split('T')[0],
+      w.totalMeals,
+      w.totalSnackBites,
+      w.eventCount,
+    ]);
+    const escape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(',')).join('\n');
+
+    const filename = `rebuilt-projections-${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+module.exports = router;

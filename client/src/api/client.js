@@ -39,7 +39,7 @@ export const api = {
   },
 
   // For CSV download
-  downloadCsv: async (path) => {
+  downloadCsv: async (path, filename = `payroll-${new Date().toISOString().split('T')[0]}.csv`) => {
     const token = getToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -49,7 +49,7 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `payroll-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   },

@@ -19,6 +19,8 @@ import AdminMessages from './pages/admin/Messages.jsx';
 import AdminLeaderboard from './pages/admin/Leaderboard.jsx';
 import AdminStaff from './pages/admin/Staff.jsx';
 import AdminSettings from './pages/admin/Settings.jsx';
+import AdminExports from './pages/admin/Exports.jsx';
+import BagTagsPrint from './pages/admin/BagTagsPrint.jsx';
 
 // Ambassador
 import AmbassadorLayout from './components/layout/AmbassadorLayout.jsx';
@@ -67,6 +69,9 @@ export default function App() {
           <Route path="/set-password" element={<SetPassword />} />
           <Route path="/" element={<RootRedirect />} />
 
+          {/* Standalone print view — no sidebar/layout chrome */}
+          <Route path="/admin/exports/bag-tags/print" element={<AdminOnlyRoute><BagTagsPrint /></AdminOnlyRoute>} />
+
           {/* Admin + Event Coordinator routes */}
           <Route
             path="/admin"
@@ -87,6 +92,7 @@ export default function App() {
             <Route path="reports" element={<AdminOnlyRoute><AdminReports /></AdminOnlyRoute>} />
             <Route path="payroll" element={<AdminOnlyRoute><AdminPayroll /></AdminOnlyRoute>} />
             <Route path="staff" element={<AdminOnlyRoute><AdminStaff /></AdminOnlyRoute>} />
+            <Route path="exports" element={<AdminOnlyRoute><AdminExports /></AdminOnlyRoute>} />
             <Route path="messages/:eventId" element={<AdminMessages />} />
             <Route path="messages" element={<AdminMessages />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />

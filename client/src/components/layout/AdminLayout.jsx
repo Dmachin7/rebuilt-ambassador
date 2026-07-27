@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
   LayoutDashboard, Calendar, Users, FileText, DollarSign,
-  Trophy, MessageSquare, LogOut, Menu, Zap, UserCog, CalendarClock, Settings,
+  Trophy, MessageSquare, LogOut, Menu, Zap, UserCog, CalendarClock, Settings, Printer,
 } from 'lucide-react';
 
 const ALL_NAV = [
@@ -15,6 +15,7 @@ const ALL_NAV = [
   { to: '/admin/staff',        icon: UserCog,         label: 'Staff',        roles: ['ADMIN'] },
   { to: '/admin/reports',      icon: FileText,        label: 'Reports',      roles: ['ADMIN'] },
   { to: '/admin/payroll',      icon: DollarSign,      label: 'Payroll',      roles: ['ADMIN'] },
+  { to: '/admin/exports',      icon: Printer,         label: 'Exports',      roles: ['ADMIN'] },
   { to: '/admin/messages',     icon: MessageSquare,   label: 'Messages',     roles: ['ADMIN', 'EVENT_COORDINATOR'] },
   { to: '/admin/leaderboard',  icon: Trophy,          label: 'Leaderboard',  roles: ['ADMIN', 'EVENT_COORDINATOR'] },
   { to: '/admin/settings',     icon: Settings,        label: 'Settings',     roles: ['ADMIN', 'EVENT_COORDINATOR'] },

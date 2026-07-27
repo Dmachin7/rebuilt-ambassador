@@ -16,6 +16,11 @@ const SALE_AMOUNT_THRESHOLD = 99;
 const COMMISSION_UNDER_THRESHOLD = 20;
 const COMMISSION_OVER_THRESHOLD = 40;
 
+// Bag tag packing — each bag holds up to CONTAINER_CAPACITY containers, where one sample meal is
+// one container and SNACK_BITES_PER_CONTAINER snack bites make up one container.
+const CONTAINER_CAPACITY = 15;
+const SNACK_BITES_PER_CONTAINER = 10;
+
 module.exports = {
   HQ_ADDRESS,
   MILEAGE_RATE,
@@ -24,4 +29,6 @@ module.exports = {
   SALE_AMOUNT_THRESHOLD,
   COMMISSION_UNDER_THRESHOLD,
   COMMISSION_OVER_THRESHOLD,
+  CONTAINER_CAPACITY,
+  SNACK_BITES_PER_CONTAINER,
 };

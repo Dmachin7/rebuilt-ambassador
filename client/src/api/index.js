@@ -109,3 +109,9 @@ export const availabilityAPI = {
   setMine: (days) => api.put('/availability', { days }),
   setFor: (userId, days) => api.put(`/availability/${userId}`, { days }),
 };
+
+// Exports
+export const exportsAPI = {
+  projections: () => api.get('/exports/projections'),
+  projectionsCsv: () => api.downloadCsv('/exports/projections/csv', `rebuilt-projections-${new Date().toISOString().split('T')[0]}.csv`),
+};

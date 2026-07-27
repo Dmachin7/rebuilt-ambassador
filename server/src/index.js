@@ -14,6 +14,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const availabilityRoutes = require('./routes/availability');
+const exportRoutes = require('./routes/exports');
 
 require('./services/reminderCron');
 
@@ -38,6 +39,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/availability', availabilityRoutes);
+app.use('/api/exports', exportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

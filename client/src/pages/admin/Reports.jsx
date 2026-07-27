@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { eventsAPI, reportsAPI } from '../../api/index.js';
 import { Card, Select, Spinner, EmptyState, Button } from '../../components/ui/index.jsx';
 import { formatDate, formatDateTime, formatCurrency } from '../../utils/formatters.js';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Trash2 } from 'lucide-react';
 
 const MILEAGE_RATE = 0.30; // matches server/src/config/constants.js
 
@@ -13,6 +13,7 @@ export default function AdminReports() {
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({}); // saleId -> overThreshold override before confirming
   const [verifyingId, setVerifyingId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   const load = () =>
     Promise.all([reportsAPI.list(filter || undefined), eventsAPI.list()])
@@ -30,6 +31,19 @@ export default function AdminReports() {
       alert('Failed to verify sale: ' + err.message);
     } finally {
       setVerifyingId(null);
+    }
+  };
+
+  const handleRemove = async (reportId, sale) => {
+    if (!confirm('Remove this sale? Use this when a customer cancels their order — the ambassador will no longer be paid commission for it.')) return;
+    setRemovingId(sale.id);
+    try {
+      await reportsAPI.removeSale(reportId, sale.id);
+      await load();
+    } catch (err) {
+      alert('Failed to remove sale: ' + err.message);
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -171,6 +185,15 @@ export default function AdminReports() {
                               </Button>
                             </>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(report.id, sale)}
+                            disabled={removingId === sale.id}
+                            title="Remove this sale (e.g. the customer cancelled their order)"
+                            className="text-slate-300 hover:text-red-500 disabled:opacity-50 shrink-0"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       );
                     })}

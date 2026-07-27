@@ -40,6 +40,7 @@ export const reportsAPI = {
   create: (data) => api.post('/reports', data),
   verifySale: (reportId, saleId, overThreshold) =>
     api.put(`/reports/${reportId}/sales/${saleId}/verify`, { overThreshold }),
+  removeSale: (reportId, saleId) => api.delete(`/reports/${reportId}/sales/${saleId}`),
 };
 
 // Payments

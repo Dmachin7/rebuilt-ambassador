@@ -150,4 +150,33 @@ router.put('/:reportId/sales/:saleId/verify', verifyToken, requireRole('ADMIN'),
   }
 });
 
+// DELETE /api/reports/:reportId/sales/:saleId — admin removes a sale (e.g. the customer cancelled
+// their order) so it no longer counts toward the ambassador's commission, even after the report
+// was submitted and/or the sale already verified. Commission is always summed live from Sale rows
+// at payroll time rather than baked into the stored Payment amount, so this takes effect immediately.
+router.delete('/:reportId/sales/:saleId', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const sale = await prisma.sale.findUnique({ where: { id: req.params.saleId } });
+    if (!sale || sale.reportId !== req.params.reportId) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+
+    await prisma.sale.delete({ where: { id: sale.id } });
+
+    const remaining = await prisma.sale.count({ where: { reportId: req.params.reportId } });
+    const report = await prisma.report.findUnique({ where: { id: req.params.reportId } });
+    const mealsPerSale = remaining > 0 ? Math.round((report.mealsSold / remaining) * 100) / 100 : null;
+
+    const updated = await prisma.report.update({
+      where: { id: req.params.reportId },
+      data: { totalSales: remaining, mealsPerSale },
+      include: { sales: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

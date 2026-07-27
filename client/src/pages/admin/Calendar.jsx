@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
@@ -194,7 +193,7 @@ export default function AdminCalendar() {
         <div className="lg:col-span-3">
           <Card className="p-2 overflow-hidden">
             <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+              plugins={[dayGridPlugin, listPlugin, interactionPlugin]}
               initialView={isMobile ? 'listMonth' : 'dayGridMonth'}
               firstDay={1}
               headerToolbar={isMobile ? {
@@ -204,7 +203,7 @@ export default function AdminCalendar() {
               } : {
                 left: 'prev,next today',
                 center: 'title',
-                right: 'dayGridMonth,timeGridWeek,listWeek',
+                right: 'dayGridMonth,dayGridWeek,listWeek',
               }}
               events={calendarEvents}
               eventClick={handleEventClick}

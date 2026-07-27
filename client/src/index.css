@@ -129,8 +129,7 @@
 
 /* Event Calendar — let the custom event card content wrap instead of being clipped/ellipsized,
    so location/time/deliver-to/meals details are all visible at a glance. */
-.fc-daygrid-event-harness,
-.fc-timegrid-event-harness {
+.fc-daygrid-event-harness {
   overflow: visible !important;
 }
 .fc-event-main,

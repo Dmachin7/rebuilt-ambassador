@@ -62,13 +62,15 @@ export default function BagTagsPrint() {
           display: flex;
           flex-direction: column;
           justify-content: center;
+          align-items: center;
+          text-align: center;
           font-family: Arial, Helvetica, sans-serif;
           overflow: hidden;
         }
-        .tag-title { font-weight: 700; font-size: 13pt; color: #1e3a2f; line-height: 1.15; }
-        .tag-line { font-size: 10pt; color: #333; margin-top: 3px; }
-        .tag-contents { font-size: 10pt; color: #333; margin-top: 4px; font-weight: 600; }
-        .tag-date { font-size: 9pt; color: #666; margin-top: 6px; }
+        .tag-title { font-weight: 700; font-size: 13pt; color: #1e3a2f; line-height: 1.15; width: 100%; }
+        .tag-line { font-size: 10pt; color: #6B9B37; font-weight: 600; margin-top: 3px; width: 100%; }
+        .tag-contents { font-size: 10pt; color: #333; margin-top: 4px; font-weight: 600; width: 100%; }
+        .tag-date { font-size: 9pt; color: #666; margin-top: 6px; width: 100%; }
       `}</style>
 
       <div className="no-print" style={{ padding: '16px 20px', fontFamily: 'Arial, Helvetica, sans-serif', display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid #eee' }}>

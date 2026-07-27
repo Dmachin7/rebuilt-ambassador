@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { eventsAPI, exportsAPI } from '../../api/index.js';
 import { Card, Button, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { computeBags } from '../../utils/bagTags.js';
@@ -17,8 +19,8 @@ const shortDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short
 const longDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const formatWeekRange = (start, end) => `${shortDate(start)} – ${longDate(end)}`;
 
-// Local (not UTC) YYYY-MM-DD so a date input round-trips to the same calendar day
-// regardless of timezone offset.
+// Local (not UTC) YYYY-MM-DD so the value sent to the API matches the calendar day
+// shown, regardless of timezone offset.
 const toInputValue = (d) => {
   const dt = new Date(d);
   const y = dt.getFullYear();
@@ -26,12 +28,16 @@ const toInputValue = (d) => {
   const day = String(dt.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
-const fromInputValue = (v) => {
-  const [y, m, d] = v.split('-').map(Number);
-  return new Date(y, m - 1, d);
-};
 
 function DateRangeControl({ range, onChange }) {
+  // Mirrors `range` but also tracks an in-progress selection (start clicked, end not yet)
+  // before it's committed upward — react-datepicker fires onChange with a null end mid-pick.
+  const [pending, setPending] = useState([range.start, range.end]);
+
+  useEffect(() => {
+    setPending([range.start, range.end]);
+  }, [range.start, range.end]);
+
   const rangeDays = Math.round((range.end - range.start) / 86400000) + 1;
   const shiftRange = (days) => onChange({ start: addDays(range.start, days), end: addDays(range.end, days) });
   const resetToThisWeek = () => {
@@ -39,21 +45,23 @@ function DateRangeControl({ range, onChange }) {
     onChange({ start, end: addDays(start, 6) });
   };
 
+  const handlePickerChange = (dates) => {
+    const [start, end] = dates;
+    setPending([start, end]);
+    if (start && end) onChange({ start, end });
+  };
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <Button variant="secondary" size="sm" onClick={() => shiftRange(-rangeDays)}>‹</Button>
-      <input
-        type="date"
-        value={toInputValue(range.start)}
-        onChange={(e) => onChange({ ...range, start: fromInputValue(e.target.value) })}
-        className="input-field !w-auto text-sm py-1.5"
-      />
-      <span className="text-slate-400 text-sm">to</span>
-      <input
-        type="date"
-        value={toInputValue(range.end)}
-        onChange={(e) => onChange({ ...range, end: fromInputValue(e.target.value) })}
-        className="input-field !w-auto text-sm py-1.5"
+      <DatePicker
+        selectsRange
+        startDate={pending[0]}
+        endDate={pending[1]}
+        onChange={handlePickerChange}
+        dateFormat="MMM d, yyyy"
+        calendarStartDay={1}
+        className="input-field !w-56 text-sm py-1.5"
       />
       <Button variant="secondary" size="sm" onClick={() => shiftRange(rangeDays)}>›</Button>
       <Button variant="secondary" size="sm" onClick={resetToThisWeek}>This Week</Button>

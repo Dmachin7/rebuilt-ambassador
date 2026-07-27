@@ -112,6 +112,19 @@ export const availabilityAPI = {
 
 // Exports
 export const exportsAPI = {
-  projections: () => api.get('/exports/projections'),
-  projectionsCsv: () => api.downloadCsv('/exports/projections/csv', `rebuilt-projections-${new Date().toISOString().split('T')[0]}.csv`),
+  projections: (start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.get(`/exports/projections${params.length ? `?${params.join('&')}` : ''}`);
+  },
+  projectionsCsv: (start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.downloadCsv(
+      `/exports/projections/csv${params.length ? `?${params.join('&')}` : ''}`,
+      `rebuilt-projections-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  },
 };

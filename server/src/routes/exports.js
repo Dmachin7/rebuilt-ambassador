@@ -15,12 +15,25 @@ function startOfWeekMonday(d) {
   return date;
 }
 
-async function weeklyProjections() {
+// start/end (YYYY-MM-DD) let admins report on any range, including past weeks — so we
+// only exclude CANCELLED events rather than restricting to UPCOMING/ACTIVE.
+async function weeklyProjections({ start, end } = {}) {
+  const where = {
+    status: { not: 'CANCELLED' },
+    OR: [{ samplesNeeded: { gt: 0 } }, { snackBitesNeeded: { gt: 0 } }],
+  };
+  if (start || end) {
+    where.date = {};
+    if (start) where.date.gte = new Date(start);
+    if (end) {
+      const endExclusive = new Date(end);
+      endExclusive.setDate(endExclusive.getDate() + 1);
+      where.date.lt = endExclusive;
+    }
+  }
+
   const events = await prisma.event.findMany({
-    where: {
-      status: { in: ['UPCOMING', 'ACTIVE'] },
-      OR: [{ samplesNeeded: { gt: 0 } }, { snackBitesNeeded: { gt: 0 } }],
-    },
+    where,
     select: { date: true, samplesNeeded: true, snackBitesNeeded: true },
     orderBy: { date: 'asc' },
   });
@@ -45,7 +58,8 @@ async function weeklyProjections() {
 // GET /api/exports/projections — weekly meals/snack-bites needed across upcoming events
 router.get('/projections', verifyToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const weeks = await weeklyProjections();
+    const { start, end } = req.query;
+    const weeks = await weeklyProjections({ start, end });
     res.json(weeks);
   } catch (err) {
     console.error(err);
@@ -56,7 +70,8 @@ router.get('/projections', verifyToken, requireRole('ADMIN'), async (req, res) =
 // GET /api/exports/projections/csv
 router.get('/projections/csv', verifyToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const weeks = await weeklyProjections();
+    const { start, end } = req.query;
+    const weeks = await weeklyProjections({ start, end });
     const headers = ['Week Start', 'Week End', 'Total Meals', 'Total Snack Bites', 'Events'];
     const rows = weeks.map((w) => [
       w.weekStart.toISOString().split('T')[0],

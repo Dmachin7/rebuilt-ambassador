@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { eventsAPI, exportsAPI } from '../../api/index.js';
-import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
+import { Card, Button, Select, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { computeBags } from '../../utils/bagTags.js';
 import { MapPin, Download, Printer, AlertTriangle } from 'lucide-react';
 
@@ -17,19 +17,67 @@ const shortDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short
 const longDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const formatWeekRange = (start, end) => `${shortDate(start)} – ${longDate(end)}`;
 
-function ProjectionsTab() {
+// Local (not UTC) YYYY-MM-DD so a date input round-trips to the same calendar day
+// regardless of timezone offset.
+const toInputValue = (d) => {
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const fromInputValue = (v) => {
+  const [y, m, d] = v.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+function DateRangeControl({ range, onChange }) {
+  const rangeDays = Math.round((range.end - range.start) / 86400000) + 1;
+  const shiftRange = (days) => onChange({ start: addDays(range.start, days), end: addDays(range.end, days) });
+  const resetToThisWeek = () => {
+    const start = startOfWeekMonday(new Date());
+    onChange({ start, end: addDays(start, 6) });
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Button variant="secondary" size="sm" onClick={() => shiftRange(-rangeDays)}>‹</Button>
+      <input
+        type="date"
+        value={toInputValue(range.start)}
+        onChange={(e) => onChange({ ...range, start: fromInputValue(e.target.value) })}
+        className="input-field !w-auto text-sm py-1.5"
+      />
+      <span className="text-slate-400 text-sm">to</span>
+      <input
+        type="date"
+        value={toInputValue(range.end)}
+        onChange={(e) => onChange({ ...range, end: fromInputValue(e.target.value) })}
+        className="input-field !w-auto text-sm py-1.5"
+      />
+      <Button variant="secondary" size="sm" onClick={() => shiftRange(rangeDays)}>›</Button>
+      <Button variant="secondary" size="sm" onClick={resetToThisWeek}>This Week</Button>
+    </div>
+  );
+}
+
+function ProjectionsTab({ range }) {
   const [weeks, setWeeks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    exportsAPI.projections().then(setWeeks).finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    exportsAPI
+      .projections(toInputValue(range.start), toInputValue(range.end))
+      .then(setWeeks)
+      .finally(() => setLoading(false));
+  }, [range.start, range.end]);
 
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      await exportsAPI.projectionsCsv();
+      await exportsAPI.projectionsCsv(toInputValue(range.start), toInputValue(range.end));
     } catch (err) {
       alert('Failed to download CSV: ' + err.message);
     } finally {
@@ -42,14 +90,14 @@ function ProjectionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">Total meals and snack bites needed, grouped by week (Mon–Sun), across all upcoming events.</p>
+        <p className="text-sm text-slate-500">Total meals and snack bites needed, grouped by week (Mon–Sun), within the selected date range.</p>
         <Button onClick={handleDownload} disabled={downloading} className="shrink-0 flex items-center gap-1.5">
           <Download size={14} /> {downloading ? 'Downloading...' : 'Download CSV'}
         </Button>
       </div>
 
       {weeks.length === 0 ? (
-        <Card className="p-8"><EmptyState icon="📦" title="No upcoming meals/snacks needed" description="Weeks appear here once events have sample meals or snack bites set" /></Card>
+        <Card className="p-8"><EmptyState icon="📦" title="No meals/snack bites needed" description="Weeks appear here once events in this range have sample meals or snack bites set" /></Card>
       ) : (
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
@@ -78,39 +126,37 @@ function ProjectionsTab() {
   );
 }
 
-function BagTagsTab() {
+function BagTagsTab({ range }) {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [selected, setSelected] = useState({}); // eventId -> boolean
 
   useEffect(() => {
     eventsAPI.list().then(setEvents).finally(() => setLoading(false));
   }, []);
 
-  const weekEnd = addDays(weekStart, 6);
-  const weekEventsAll = events.filter((e) => {
+  const rangeEvents = events.filter((e) => {
     const d = new Date(e.date);
-    return d >= weekStart && d < addDays(weekEnd, 1) && ((e.samplesNeeded || 0) > 0 || (e.snackBitesNeeded || 0) > 0);
+    return d >= range.start && d < addDays(range.end, 1) && ((e.samplesNeeded || 0) > 0 || (e.snackBitesNeeded || 0) > 0);
   });
 
   // Default-select events that have a deliver-to location; leave ones missing it unchecked.
   useEffect(() => {
     setSelected((prev) => {
       const next = { ...prev };
-      weekEventsAll.forEach((e) => {
+      rangeEvents.forEach((e) => {
         if (!(e.id in next)) next[e.id] = !!e.pickupLocation;
       });
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, events.length]);
+  }, [range.start, range.end, events.length]);
 
   const toggle = (id) => setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const handlePrint = () => {
-    const chosen = weekEventsAll.filter((e) => selected[e.id]);
+    const chosen = rangeEvents.filter((e) => selected[e.id]);
     const tags = chosen.flatMap((e) => {
       const bags = computeBags(e.samplesNeeded, e.snackBitesNeeded);
       return bags.map((bag, i) => ({
@@ -130,29 +176,23 @@ function BagTagsTab() {
     navigate('/admin/exports/bag-tags/print', { state: { tags } });
   };
 
-  const selectedCount = weekEventsAll.filter((e) => selected[e.id]).length;
+  const selectedCount = rangeEvents.filter((e) => selected[e.id]).length;
 
   if (loading) return <div className="flex justify-center py-16"><Spinner className="w-8 h-8" /></div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setWeekStart((w) => addDays(w, -7))}>‹ Prev</Button>
-          <div className="text-sm font-semibold text-slate-700 min-w-[160px] text-center">{formatWeekRange(weekStart, weekEnd)}</div>
-          <Button variant="secondary" size="sm" onClick={() => setWeekStart((w) => addDays(w, 7))}>Next ›</Button>
-          <Button variant="secondary" size="sm" onClick={() => setWeekStart(startOfWeekMonday(new Date()))}>This Week</Button>
-        </div>
+      <div className="flex items-center justify-end gap-3">
         <Button onClick={handlePrint} disabled={selectedCount === 0} className="flex items-center gap-1.5">
           <Printer size={14} /> Print Tags ({selectedCount})
         </Button>
       </div>
 
-      {weekEventsAll.length === 0 ? (
-        <Card className="p-8"><EmptyState icon="🏷️" title="No events need bag tags this week" description="Events show up here once they have sample meals or snack bites set" /></Card>
+      {rangeEvents.length === 0 ? (
+        <Card className="p-8"><EmptyState icon="🏷️" title="No events need bag tags in this range" description="Events show up here once they have sample meals or snack bites set" /></Card>
       ) : (
         <Card className="divide-y divide-slate-50">
-          {weekEventsAll.map((e) => {
+          {rangeEvents.map((e) => {
             const bags = computeBags(e.samplesNeeded, e.snackBitesNeeded);
             return (
               <label key={e.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50">
@@ -190,7 +230,11 @@ function BagTagsTab() {
 }
 
 export default function AdminExports() {
-  const [tab, setTab] = useState('projections');
+  const [type, setType] = useState('bagTags');
+  const [range, setRange] = useState(() => {
+    const start = startOfWeekMonday(new Date());
+    return { start, end: addDays(start, 6) };
+  });
 
   return (
     <div className="space-y-5">
@@ -199,19 +243,15 @@ export default function AdminExports() {
         <p className="text-sm text-slate-500">Weekly projections and printable bag tags.</p>
       </div>
 
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        {[['projections', 'Projections'], ['bagTags', 'Bag Tags']].map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => setTab(val)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Select value={type} onChange={(e) => setType(e.target.value)} className="!w-44">
+          <option value="bagTags">Bag Tags</option>
+          <option value="projections">Projections</option>
+        </Select>
+        <DateRangeControl range={range} onChange={setRange} />
       </div>
 
-      {tab === 'projections' ? <ProjectionsTab /> : <BagTagsTab />}
+      {type === 'projections' ? <ProjectionsTab range={range} /> : <BagTagsTab range={range} />}
     </div>
   );
 }

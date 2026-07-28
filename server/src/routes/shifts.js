@@ -72,6 +72,60 @@ router.get('/hours', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), asy
   }
 });
 
+// Scheduled on-site duration mirrors computePay's actual-hours logic (checkin at arrival time,
+// checkout after breakdown) but projected from the event's planned times since these shifts
+// haven't happened yet.
+function estimateShiftHours(event) {
+  const arrivalTime = new Date(computeArrivalTime(event));
+  const scheduledCheckout = event.endTime
+    ? new Date(new Date(event.endTime).getTime() + (event.breakdownTimeMins || 0) * 60000)
+    : arrivalTime;
+  const onSiteHours = Math.max(0, (scheduledCheckout - arrivalTime) / 3600000);
+  const driveHours = (event.driveTimeMins || 0) / 60;
+  return Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + driveHours) * 100) / 100;
+}
+
+// GET /api/shifts/upcoming-hours — estimated hours already assigned but not yet worked (shift
+// status ASSIGNED/CHECKED_IN) per ambassador, for events in the given date range. Lets admins
+// see who's under-booked for the week before those shifts actually happen.
+router.get('/upcoming-hours', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
+  try {
+    const { start, end } = req.query;
+    const where = {
+      ambassadorId: { not: null },
+      status: { in: ['ASSIGNED', 'CHECKED_IN'] },
+    };
+    if (start || end) {
+      where.event = { date: {} };
+      if (start) where.event.date.gte = new Date(start);
+      if (end) where.event.date.lte = new Date(end);
+    }
+    const shifts = await prisma.shift.findMany({
+      where,
+      include: {
+        event: { select: { date: true, endTime: true, setupTimeMins: true, breakdownTimeMins: true, driveTimeMins: true } },
+        ambassador: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const byAmbassador = new Map();
+    shifts.forEach((s) => {
+      const bucket = byAmbassador.get(s.ambassadorId) || { ambassador: s.ambassador, totalHours: 0, shiftCount: 0 };
+      bucket.totalHours += estimateShiftHours(s.event);
+      bucket.shiftCount += 1;
+      byAmbassador.set(s.ambassadorId, bucket);
+    });
+
+    const result = Array.from(byAmbassador.values())
+      .map((b) => ({ ...b, totalHours: Math.round(b.totalHours * 100) / 100 }))
+      .sort((a, b) => b.totalHours - a.totalHours);
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/shifts
 router.get('/', verifyToken, async (req, res) => {
   try {

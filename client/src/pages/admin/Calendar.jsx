@@ -18,7 +18,8 @@ export default function AdminCalendar() {
   const [pendingChanges, setPendingChanges] = useState({}); // eventId → newDate
   const [saving, setSaving] = useState(false);
   const [bagSaving, setBagSaving] = useState(false);
-  const [hoursData, setHoursData] = useState([]); // per-ambassador hours for the visible range
+  const [hoursData, setHoursData] = useState([]); // per-ambassador worked/paid hours for the visible range
+  const [upcomingHoursData, setUpcomingHoursData] = useState([]); // per-ambassador assigned-but-not-yet-completed hours
   const [visibleRange, setVisibleRange] = useState(null); // { start, end, viewType }
   const [staff, setStaff] = useState([]); // ADMIN/EVENT_COORDINATOR users, for the "Bagged By" dropdown
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -42,6 +43,7 @@ export default function AdminCalendar() {
   useEffect(() => {
     if (!visibleRange) return;
     shiftsAPI.hours(visibleRange.start, visibleRange.end).then(setHoursData).catch(() => {});
+    shiftsAPI.upcomingHours(visibleRange.start, visibleRange.end).then(setUpcomingHoursData).catch(() => {});
   }, [visibleRange]);
 
   const handleDatesSet = (arg) => {
@@ -229,6 +231,11 @@ export default function AdminCalendar() {
                     {ev.location && (
                       <div className="text-slate-600 truncate">📍 {ev.location}</div>
                     )}
+                    <div className="text-slate-600 truncate">
+                      👤 {ev.shifts.filter((s) => s.ambassador).length > 0
+                        ? ev.shifts.filter((s) => s.ambassador).map((s) => s.ambassador.firstName).join(', ')
+                        : 'Unassigned'}
+                    </div>
                     {ev.pickupLocation && (
                       <div className="mt-0.5 px-1 py-0.5 rounded bg-amber-200/80 text-amber-900 font-medium">
                         → {ev.pickupLocation}
@@ -277,6 +284,9 @@ export default function AdminCalendar() {
                 )}
                 <div>
                   {selected.shifts.filter((s) => s.ambassadorId).length}/{selected.shifts.length} ambassadors
+                  {selected.shifts.filter((s) => s.ambassador).length > 0 && (
+                    <span className="text-slate-500"> — {selected.shifts.filter((s) => s.ambassador).map((s) => `${s.ambassador.firstName} ${s.ambassador.lastName}`).join(', ')}</span>
+                  )}
                 </div>
               </div>
 
@@ -329,6 +339,27 @@ export default function AdminCalendar() {
                   <div key={h.ambassador?.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-6 h-6 bg-mint-100 rounded-full flex items-center justify-center text-xs font-medium text-mint-700 shrink-0">
+                        {h.ambassador?.firstName?.[0]}{h.ambassador?.lastName?.[0]}
+                      </div>
+                      <span className="text-xs text-slate-600 truncate">{h.ambassador?.firstName} {h.ambassador?.lastName}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 shrink-0 ml-2">{formatHours(h.totalHours)}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Upcoming (assigned but not yet completed) hours, scoped to the visible month/week —
+              sorted lowest-first so under-booked ambassadors are easy to spot. */}
+          {upcomingHoursData.length > 0 && (
+            <Card className="p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Upcoming Hours ({rangeLabel})</p>
+              <div className="space-y-2">
+                {[...upcomingHoursData].sort((a, b) => a.totalHours - b.totalHours).slice(0, 8).map((h) => (
+                  <div key={h.ambassador?.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-xs font-medium text-amber-700 shrink-0">
                         {h.ambassador?.firstName?.[0]}{h.ambassador?.lastName?.[0]}
                       </div>
                       <span className="text-xs text-slate-600 truncate">{h.ambassador?.firstName} {h.ambassador?.lastName}</span>

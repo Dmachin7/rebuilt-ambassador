@@ -5,10 +5,10 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
 import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
-import { Badge, Button, Card, Select, Spinner } from '../../components/ui/index.jsx';
+import { Badge, Button, Card, Modal, Select, Spinner } from '../../components/ui/index.jsx';
 import EventFormModal from '../../components/EventFormModal.jsx';
 import { eventColor, formatDateTime, formatHours, formatTime } from '../../utils/formatters.js';
-import { Save } from 'lucide-react';
+import { Save, UserPlus } from 'lucide-react';
 
 export default function AdminCalendar() {
   const [events, setEvents] = useState([]);
@@ -22,6 +22,10 @@ export default function AdminCalendar() {
   const [upcomingHoursData, setUpcomingHoursData] = useState([]); // per-ambassador assigned-but-not-yet-completed hours
   const [visibleRange, setVisibleRange] = useState(null); // { start, end, viewType }
   const [staff, setStaff] = useState([]); // ADMIN/EVENT_COORDINATOR users, for the "Bagged By" dropdown
+  const [ambassadors, setAmbassadors] = useState([]); // for the assign/change-ambassador dropdown
+  const [assignModal, setAssignModal] = useState(null); // shift being assigned/reassigned
+  const [selectedAmb, setSelectedAmb] = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [formEditingEvent, setFormEditingEvent] = useState(null);
   const [formInitialDate, setFormInitialDate] = useState(null);
@@ -35,8 +39,42 @@ export default function AdminCalendar() {
     Promise.all([
       loadEvents(),
       usersAPI.list().then((all) => setStaff(all.filter((u) => u.role === 'ADMIN' || u.role === 'EVENT_COORDINATOR'))),
+      usersAPI.list('AMBASSADOR').then(setAmbassadors),
     ]).finally(() => setLoading(false));
   }, [loadEvents]);
+
+  // Refetches events after an assign/unassign so both the calendar grid and the still-open
+  // side panel (a snapshot, not a live reference into `events`) reflect the change.
+  const reloadAndSyncSelected = async () => {
+    const fresh = await eventsAPI.list();
+    setEvents(fresh);
+    setSelected((prev) => (prev ? fresh.find((e) => e.id === prev.id) || null : prev));
+  };
+
+  const handleAssign = async () => {
+    if (!assignModal || !selectedAmb) return;
+    setAssignSaving(true);
+    try {
+      await shiftsAPI.assign(assignModal.id, selectedAmb);
+      setAssignModal(null);
+      setSelectedAmb('');
+      await reloadAndSyncSelected();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const handleUnassign = async (shiftId) => {
+    if (!confirm('Remove ambassador from this shift?')) return;
+    try {
+      await shiftsAPI.unassign(shiftId);
+      await reloadAndSyncSelected();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   // Ambassador hours are scoped to whatever month/week is currently visible on the calendar,
   // refetched whenever the view range changes (month/week navigation, or switching views).
@@ -282,11 +320,32 @@ export default function AdminCalendar() {
                     {selected.snackBitesNeeded && <span>{selected.snackBitesNeeded} snacks</span>}
                   </div>
                 )}
-                <div>
+                <div className="font-medium text-slate-700">
                   {selected.shifts.filter((s) => s.ambassadorId).length}/{selected.shifts.length} ambassadors
-                  {selected.shifts.filter((s) => s.ambassador).length > 0 && (
-                    <span className="text-slate-500"> — {selected.shifts.filter((s) => s.ambassador).map((s) => `${s.ambassador.firstName} ${s.ambassador.lastName}`).join(', ')}</span>
-                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {selected.shifts.map((shift) => (
+                    <div key={shift.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-2 py-1.5">
+                      <span className="truncate">
+                        {shift.ambassador
+                          ? `${shift.ambassador.firstName} ${shift.ambassador.lastName}`
+                          : <span className="text-slate-400 italic">Open shift</span>}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => { setAssignModal(shift); setSelectedAmb(shift.ambassadorId || ''); }}
+                          className="text-mint-600 hover:text-mint-700 font-medium flex items-center gap-1"
+                        >
+                          <UserPlus size={11} /> {shift.ambassador ? 'Change' : 'Assign'}
+                        </button>
+                        {shift.ambassador && (
+                          <button onClick={() => handleUnassign(shift.id)} className="text-slate-400 hover:text-red-500">
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -401,6 +460,25 @@ export default function AdminCalendar() {
           if (formEditingEvent) setSelected(null);
         }}
       />
+
+      {/* Assign/Change Ambassador Modal — also used to reassign an already-assigned shift, since
+          assign() just overwrites ambassadorId */}
+      <Modal isOpen={!!assignModal} onClose={() => setAssignModal(null)} title={assignModal?.ambassadorId ? 'Change Ambassador' : 'Assign Ambassador'}>
+        <div className="space-y-4">
+          <Select label="Select Ambassador" value={selectedAmb} onChange={(e) => setSelectedAmb(e.target.value)}>
+            <option value="">— Choose an ambassador —</option>
+            {ambassadors.map((a) => (
+              <option key={a.id} value={a.id}>{a.firstName} {a.lastName} ({a.email})</option>
+            ))}
+          </Select>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setAssignModal(null)}>Cancel</Button>
+            <Button onClick={handleAssign} disabled={!selectedAmb || assignSaving}>
+              {assignSaving ? 'Saving...' : assignModal?.ambassadorId ? 'Save' : 'Assign'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

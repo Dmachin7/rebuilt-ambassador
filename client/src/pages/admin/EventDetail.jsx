@@ -286,6 +286,9 @@ export default function EventDetail() {
                         {shift.checkinTime && !shift.checkoutTime && (
                           <button onClick={() => handleAdminCheckout(shift.id)} className="text-xs text-yellow-600 hover:text-yellow-700">Check Out</button>
                         )}
+                        <button onClick={() => { setAssignModal(shift); setSelectedAmb(shift.ambassadorId || ''); }} className="text-xs text-slate-400 hover:text-mint-600 flex items-center gap-1">
+                          <UserPlus size={11} /> Change
+                        </button>
                         <button onClick={() => openEdit(shift)} className="text-xs text-slate-400 hover:text-mint-600 flex items-center gap-1">
                           <Pencil size={11} /> Edit
                         </button>
@@ -355,8 +358,8 @@ export default function EventDetail() {
         </div>
       </div>
 
-      {/* Assign Modal */}
-      <Modal isOpen={!!assignModal} onClose={() => setAssignModal(null)} title="Assign Ambassador">
+      {/* Assign Modal — also used to reassign an already-assigned shift, since assign() just overwrites ambassadorId */}
+      <Modal isOpen={!!assignModal} onClose={() => setAssignModal(null)} title={assignModal?.ambassadorId ? 'Change Ambassador' : 'Assign Ambassador'}>
         <div className="space-y-4">
           <Select label="Select Ambassador" value={selectedAmb} onChange={(e) => setSelectedAmb(e.target.value)}>
             <option value="">— Choose an ambassador —</option>
@@ -367,7 +370,7 @@ export default function EventDetail() {
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setAssignModal(null)}>Cancel</Button>
             <Button onClick={handleAssign} disabled={!selectedAmb || saving}>
-              {saving ? 'Assigning...' : 'Assign'}
+              {saving ? 'Saving...' : assignModal?.ambassadorId ? 'Save' : 'Assign'}
             </Button>
           </div>
         </div>

@@ -110,7 +110,10 @@ export default function AdminCalendar() {
   const searchResults = searching
     ? [...events].filter(matchesSearch).sort((a, b) => new Date(b.date) - new Date(a.date))
     : null;
-  const lastMatch = searchResults?.[0] || null;
+  // "Last time" means the most recent occurrence that's already happened — an upcoming
+  // scheduled visit further out shouldn't win just because its date sorts later.
+  const now = new Date();
+  const lastMatch = searchResults?.find((e) => e.status === 'COMPLETED' || new Date(e.date) < now) || null;
 
   const calendarEvents = events.filter(matchesSearch).map((e) => {
     const assigned = e.shifts.filter((s) => s.ambassadorId).length;

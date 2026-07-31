@@ -83,7 +83,12 @@ export default function AdminEvents() {
     .filter(matchesSearch)
     .sort((a, b) => (searching ? new Date(b.date) - new Date(a.date) : new Date(a.date) - new Date(b.date)));
 
-  const lastMatch = searching ? displayedEvents[0] : null;
+  // "Last time" means the most recent occurrence that's already happened — an upcoming
+  // scheduled visit further out shouldn't win just because its date sorts later.
+  const now = new Date();
+  const lastMatch = searching
+    ? displayedEvents.find((e) => e.status === 'COMPLETED' || new Date(e.date) < now) || null
+    : null;
 
   return (
     <div className="space-y-5">

@@ -8,7 +8,7 @@ import { eventsAPI, shiftsAPI, usersAPI } from '../../api/index.js';
 import { Badge, Button, Card, Modal, Select, Spinner } from '../../components/ui/index.jsx';
 import EventFormModal from '../../components/EventFormModal.jsx';
 import { eventColor, formatDateTime, formatHours, formatTime } from '../../utils/formatters.js';
-import { Save, UserPlus } from 'lucide-react';
+import { Save, UserPlus, Search } from 'lucide-react';
 
 export default function AdminCalendar() {
   const [events, setEvents] = useState([]);
@@ -29,6 +29,7 @@ export default function AdminCalendar() {
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [formEditingEvent, setFormEditingEvent] = useState(null);
   const [formInitialDate, setFormInitialDate] = useState(null);
+  const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
   const loadEvents = useCallback(() => {
@@ -96,7 +97,22 @@ export default function AdminCalendar() {
     : visibleRange.viewType.includes('Week') ? 'This Week'
     : 'This Month';
 
-  const calendarEvents = events.map((e) => {
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
+  const matchesSearch = (e) =>
+    !searching ||
+    e.title.toLowerCase().includes(query) ||
+    (e.location || '').toLowerCase().includes(query) ||
+    (e.pickupLocation || '').toLowerCase().includes(query);
+
+  // Sorted most-recent-first purely for the sidebar "search results" list below — finding the
+  // last time we went somewhere is the point of the search, so that match should lead.
+  const searchResults = searching
+    ? [...events].filter(matchesSearch).sort((a, b) => new Date(b.date) - new Date(a.date))
+    : null;
+  const lastMatch = searchResults?.[0] || null;
+
+  const calendarEvents = events.filter(matchesSearch).map((e) => {
     const assigned = e.shifts.filter((s) => s.ambassadorId).length;
     const total = e.shifts.length;
     const hasPending = pendingChanges[e.id] !== undefined;
@@ -204,6 +220,25 @@ export default function AdminCalendar() {
       {hasPending && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-700">
           {Object.keys(pendingChanges).length} unsaved change{Object.keys(pendingChanges).length !== 1 ? 's' : ''} — click Save to confirm.
+        </div>
+      )}
+
+      {/* Search — filters the calendar grid and drives the "search results" sidebar list below,
+          so finding the last time we went somewhere doesn't require paging through months. */}
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title or location..."
+          className="input-field pl-8 text-sm py-1.5 w-full"
+        />
+      </div>
+
+      {lastMatch && (
+        <div className="bg-mint-50 border border-mint-200 rounded-lg px-4 py-2.5 text-sm text-mint-800">
+          Last time: <span className="font-semibold">{new Date(lastMatch.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span> — {lastMatch.title} ({lastMatch.location})
         </div>
       )}
 
@@ -430,18 +465,21 @@ export default function AdminCalendar() {
             </Card>
           )}
 
-          {/* Upcoming list */}
+          {/* Upcoming list — swaps to search results (most recent first) while searching */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Upcoming Events</p>
-            {events.filter((e) => e.status === 'UPCOMING').slice(0, 5).map((e) => (
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              {searching ? `Search Results (${searchResults.length})` : 'Upcoming Events'}
+            </p>
+            {(searching ? searchResults : events.filter((e) => e.status === 'UPCOMING')).slice(0, searching ? 15 : 5).map((e) => (
               <button
                 key={e.id}
                 onClick={() => setSelected(e)}
                 className={`w-full text-left bg-white border rounded-lg px-3 py-2 hover:border-mint-300 transition-colors ${pendingChanges[e.id] ? 'border-amber-300' : 'border-slate-100'}`}
               >
                 <div className="text-xs font-medium text-slate-700 truncate">{e.title}</div>
-                <div className="text-xs text-slate-400 mt-0.5">
-                  {new Date(pendingChanges[e.id] || e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                  {new Date(pendingChanges[e.id] || e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {searching && <span className="truncate">· {e.location}</span>}
                   {pendingChanges[e.id] && <span className="text-amber-500 ml-1">*unsaved</span>}
                 </div>
               </button>

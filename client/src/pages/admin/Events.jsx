@@ -4,18 +4,21 @@ import { eventsAPI } from '../../api/index.js';
 import { Card, Button, Badge, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import EventFormModal from '../../components/EventFormModal.jsx';
 import { formatShortDate } from '../../utils/formatters.js';
-import { Plus, MapPin, Clock, Users, Trash2, Edit2 } from 'lucide-react';
+import { Plus, MapPin, Clock, Users, Trash2, Edit2, Search } from 'lucide-react';
 
 export default function AdminEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('UPCOMING');
+  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
 
-  const load = () => eventsAPI.list(filter || undefined).then(setEvents).finally(() => setLoading(false));
+  // Fetched once, unfiltered — the status tabs and search below just narrow this client-side, so
+  // searching for a past location isn't blocked by whichever tab happens to be selected.
+  const load = () => eventsAPI.list().then(setEvents).finally(() => setLoading(false));
 
-  useEffect(() => { setLoading(true); load(); }, [filter]);
+  useEffect(() => { setLoading(true); load(); }, []);
 
   // Restore scroll position when returning from an event's detail page, so backing out of an event
   // doesn't dump the admin back at the top of a long list. Only on the first load after mount —
@@ -64,33 +67,76 @@ export default function AdminEvents() {
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
+  const matchesSearch = (e) =>
+    !searching ||
+    e.title.toLowerCase().includes(query) ||
+    (e.location || '').toLowerCase().includes(query) ||
+    (e.pickupLocation || '').toLowerCase().includes(query);
+
+  // Searching looks across every event regardless of the status tab (so a past location isn't
+  // hidden just because "Upcoming" happens to be selected), and surfaces the most recent match
+  // first — the point of the search is finding the last time we went somewhere.
+  const displayedEvents = events
+    .filter((e) => searching || !filter || e.status === filter)
+    .filter(matchesSearch)
+    .sort((a, b) => (searching ? new Date(b.date) - new Date(a.date) : new Date(a.date) - new Date(b.date)));
+
+  const lastMatch = searching ? displayedEvents[0] : null;
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Events</h1>
-          <p className="text-sm text-slate-500">{events.length} events</p>
+          <p className="text-sm text-slate-500">{searching ? `${displayedEvents.length} of ${events.length} events` : `${events.length} events`}</p>
         </div>
         <Button onClick={openCreate}><Plus size={16} /> New Event</Button>
       </div>
 
-      {/* Filter tabs */}
-      <div className="overflow-x-auto">
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit min-w-max">
-          {[['UPCOMING', 'Upcoming'], ['COMPLETED', 'Completed'], ['', 'All']].map(([val, label]) => (
-            <button key={val} onClick={() => setFilter(val)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-              {label}
-            </button>
-          ))}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or location..."
+            className="input-field pl-8 text-sm py-1.5 w-full"
+          />
+        </div>
+
+        {/* Filter tabs — ignored while searching so results aren't hidden by the active tab */}
+        <div className="overflow-x-auto">
+          <div className={`flex gap-1 bg-slate-100 rounded-lg p-1 w-fit min-w-max ${searching ? 'opacity-50 pointer-events-none' : ''}`}>
+            {[['UPCOMING', 'Upcoming'], ['COMPLETED', 'Completed'], ['', 'All']].map(([val, label]) => (
+              <button key={val} onClick={() => setFilter(val)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filter === val ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {events.length === 0 ? (
-        <Card className="p-8"><EmptyState icon="📅" title="No events found" action={<Button onClick={openCreate}><Plus size={14} /> Create your first event</Button>} /></Card>
+      {lastMatch && (
+        <div className="bg-mint-50 border border-mint-200 rounded-lg px-4 py-2.5 text-sm text-mint-800">
+          Last time: <span className="font-semibold">{formatShortDate(lastMatch.date)}</span> — {lastMatch.title} ({lastMatch.location})
+        </div>
+      )}
+
+      {displayedEvents.length === 0 ? (
+        <Card className="p-8">
+          <EmptyState
+            icon="📅"
+            title={searching ? `No events found matching "${search}"` : 'No events found'}
+            action={!searching && <Button onClick={openCreate}><Plus size={14} /> Create your first event</Button>}
+          />
+        </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {events.map((event) => {
+          {displayedEvents.map((event) => {
             const assigned = event.shifts.filter((s) => s.ambassadorId).length;
             const total = event.shifts.length;
             const accentBorder = event.hasImportantNotes

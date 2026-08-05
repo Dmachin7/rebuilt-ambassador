@@ -103,6 +103,7 @@ model Event {
   payRate           Float       @default(20.0)
   ambassadorsNeeded Int         @default(1)
   samplesNeeded     Int?
+  breakfastsNeeded  Int?
   snackBitesNeeded  Int?
   notes             String?
   hasImportantNotes Boolean     @default(false)

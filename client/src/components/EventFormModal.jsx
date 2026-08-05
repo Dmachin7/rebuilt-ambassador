@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { eventsAPI, usersAPI, availabilityAPI } from '../api/index.js';
+import { eventsAPI, usersAPI, availabilityAPI, shiftsAPI } from '../api/index.js';
 import { Button, Modal, Input, Textarea, Select } from './ui/index.jsx';
 import { MapPin } from 'lucide-react';
 import { autocompleteLocation } from '../stubs/maps.js';
@@ -42,7 +42,7 @@ const EMPTY_FORM = {
   title: '', location: '', pickupLocation: '', contactName: '', contactPhone: '', contactEmail: '',
   eventDate: '', startTime: '', endTime: '',
   setupTimeMins: 15, ambassadorsNeeded: 1,
-  samplesNeeded: '', snackBitesNeeded: '', notes: '',
+  samplesNeeded: '', breakfastsNeeded: '', snackBitesNeeded: '', notes: '',
   hasImportantNotes: false, tentNeeded: false,
   baggedAndSent: false, baggedByUserId: '',
   assignedAmbassadorIds: [],
@@ -153,6 +153,9 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
   const [assignMode, setAssignMode] = useState('open'); // 'open' | 'assign'
   const [distance, setDistance] = useState({ milesFromHq: '', driveTimeMins: '' });
   const [availabilityByAmbassador, setAvailabilityByAmbassador] = useState({});
+  const [shifts, setShifts] = useState([]); // edit mode only — existing shifts on this event
+  const [expandedShiftId, setExpandedShiftId] = useState(null);
+  const [shiftAssignSaving, setShiftAssignSaving] = useState(false);
 
   // Reset the form whenever the modal opens, or the event/date it's editing/prefilling changes.
   useEffect(() => {
@@ -176,6 +179,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
         setupTimeMins: editingEvent.setupTimeMins,
         ambassadorsNeeded: editingEvent.ambassadorsNeeded,
         samplesNeeded: editingEvent.samplesNeeded || '',
+        breakfastsNeeded: editingEvent.breakfastsNeeded || '',
         snackBitesNeeded: editingEvent.snackBitesNeeded || '',
         notes: editingEvent.notes || '',
         hasImportantNotes: editingEvent.hasImportantNotes || false,
@@ -185,18 +189,23 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
         assignedAmbassadorIds: [],
       });
       setDistance({ milesFromHq: editingEvent.milesFromHq ?? '', driveTimeMins: editingEvent.driveTimeMins ?? '' });
+      setShifts(editingEvent.shifts || []);
     } else {
       setForm({ ...EMPTY_FORM, eventDate: initialDate || '' });
       setDistance({ milesFromHq: '', driveTimeMins: '' });
+      setShifts([]);
     }
     setAssignMode('open');
+    setExpandedShiftId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editingEvent, initialDate]);
 
   // Look up each ambassador's set availability for the event's date, so the assignment list can be
   // filtered/annotated instead of relying on the ambassador's static (usually-stale) isAvailable flag.
+  // Runs for the create-flow's "assign now" picker, and always in edit mode (Shifts & Ambassadors).
   useEffect(() => {
-    if (assignMode !== 'assign' || !form.eventDate || ambassadors.length === 0) return;
+    const needsAvailability = editingEvent ? true : assignMode === 'assign';
+    if (!needsAvailability || !form.eventDate || ambassadors.length === 0) return;
     let cancelled = false;
     Promise.all(ambassadors.map((a) => availabilityAPI.get(a.id, form.eventDate, form.eventDate)))
       .then((results) => {
@@ -208,7 +217,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
       .catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignMode, form.eventDate, ambassadors]);
+  }, [assignMode, form.eventDate, ambassadors, editingEvent]);
 
   const handleSave = async () => {
     if (!form.title || !form.location || !form.eventDate) {
@@ -256,6 +265,33 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
       if (current.length >= limit) return prev;
       return { ...prev, assignedAmbassadorIds: [...current, id] };
     });
+  };
+
+  // Edit mode — assign/reassign/remove an ambassador on an existing shift directly from this
+  // modal, without needing to close it and go find the Event Detail or Calendar picker.
+  const handleAssignShift = async (shiftId, ambassadorId) => {
+    setShiftAssignSaving(true);
+    try {
+      const updated = await shiftsAPI.assign(shiftId, ambassadorId);
+      setShifts((prev) => prev.map((s) => (s.id === shiftId ? updated : s)));
+      setExpandedShiftId(null);
+      onSaved?.();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setShiftAssignSaving(false);
+    }
+  };
+
+  const handleUnassignShift = async (shiftId) => {
+    if (!confirm('Remove ambassador from this shift?')) return;
+    try {
+      await shiftsAPI.unassign(shiftId);
+      setShifts((prev) => prev.map((s) => (s.id === shiftId ? { ...s, ambassador: null, ambassadorId: null, status: 'OPEN' } : s)));
+      onSaved?.();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -321,10 +357,14 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
           <Input label="Setup (mins)" type="number" min="0" value={form.setupTimeMins} onChange={f('setupTimeMins')} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Input
             label="Sample Meals" type="number" min="0" value={form.samplesNeeded}
             onChange={f('samplesNeeded')} placeholder="Optional" className="no-spinner"
+          />
+          <Input
+            label="Sample Breakfasts" type="number" min="0" value={form.breakfastsNeeded}
+            onChange={f('breakfastsNeeded')} placeholder="Optional" className="no-spinner"
           />
           <Input
             label="Snack Bites (10s)" type="number" min="0" step="10" value={form.snackBitesNeeded}
@@ -395,6 +435,90 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
                 <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
               ))}
             </Select>
+          </div>
+        )}
+
+        {/* Shifts & Ambassadors — edit only (shifts don't exist yet during create) */}
+        {editingEvent && (
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-xs font-semibold text-slate-600 mb-3 uppercase tracking-wide">
+              Shifts & Ambassadors ({shifts.filter((s) => s.ambassadorId).length}/{shifts.length} filled)
+            </p>
+            {shifts.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No shifts on this event.</p>
+            ) : (
+              <div className="space-y-2">
+                {shifts.map((shift) => (
+                  <div key={shift.id} className="border border-slate-200 rounded-lg px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-slate-700 truncate">
+                        {shift.ambassador
+                          ? `${shift.ambassador.firstName} ${shift.ambassador.lastName}`
+                          : <span className="text-slate-400 italic">Open shift</span>}
+                      </span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedShiftId((prev) => (prev === shift.id ? null : shift.id))}
+                          className="text-xs text-mint-600 hover:text-mint-700 font-medium"
+                        >
+                          {shift.ambassador ? 'Change' : 'Assign'}
+                        </button>
+                        {shift.ambassador && (
+                          <button
+                            type="button"
+                            onClick={() => handleUnassignShift(shift.id)}
+                            className="text-xs text-slate-400 hover:text-red-500"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {expandedShiftId === shift.id && (
+                      <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+                        {!form.eventDate ? (
+                          <p className="text-xs text-slate-400 italic">Set the event date above to see availability.</p>
+                        ) : ambassadors.length === 0 ? (
+                          <p className="text-xs text-slate-400 italic">No ambassadors found.</p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                            {ambassadors.map((amb) => {
+                              const day = availabilityByAmbassador[amb.id];
+                              const availLabel = day?.status === 'OPEN' ? 'Available'
+                                : day?.status === 'OTHER' ? 'Limited'
+                                : day?.status === 'UNAVAILABLE' ? 'Unavailable'
+                                : 'Not set';
+                              const availClass = day?.status === 'OPEN' ? 'bg-green-100 text-green-700'
+                                : day?.status === 'OTHER' ? 'bg-amber-100 text-amber-700'
+                                : day?.status === 'UNAVAILABLE' ? 'bg-red-100 text-red-600'
+                                : 'bg-slate-100 text-slate-400';
+                              const isCurrent = shift.ambassadorId === amb.id;
+                              return (
+                                <button
+                                  type="button"
+                                  key={amb.id}
+                                  title={day?.status === 'OTHER' && day?.note ? day.note : undefined}
+                                  onClick={() => handleAssignShift(shift.id, amb.id)}
+                                  disabled={shiftAssignSaving || isCurrent}
+                                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-colors ${
+                                    isCurrent ? 'border-mint-400 bg-mint-50' : 'border-slate-200 hover:border-mint-300 hover:bg-mint-50'
+                                  }`}
+                                >
+                                  <span className="text-sm text-slate-700 flex-1 truncate">{amb.firstName} {amb.lastName}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${availClass}`}>{availLabel}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

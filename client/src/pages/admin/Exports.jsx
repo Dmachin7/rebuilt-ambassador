@@ -98,14 +98,14 @@ function ProjectionsTab({ range }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">Total meals and snack bites needed, grouped by week (Mon–Sun), within the selected date range.</p>
+        <p className="text-sm text-slate-500">Total meals, breakfasts, and snack bites needed, grouped by week (Mon–Sun), within the selected date range.</p>
         <Button onClick={handleDownload} disabled={downloading} className="shrink-0 flex items-center gap-1.5">
           <Download size={14} /> {downloading ? 'Downloading...' : 'Download CSV'}
         </Button>
       </div>
 
       {weeks.length === 0 ? (
-        <Card className="p-8"><EmptyState icon="📦" title="No meals/snack bites needed" description="Weeks appear here once events in this range have sample meals or snack bites set" /></Card>
+        <Card className="p-8"><EmptyState icon="📦" title="No meals/breakfasts/snack bites needed" description="Weeks appear here once events in this range have sample meals, breakfasts, or snack bites set" /></Card>
       ) : (
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
@@ -113,6 +113,7 @@ function ProjectionsTab({ range }) {
               <tr>
                 <th className="text-left px-4 py-2.5">Week</th>
                 <th className="text-right px-4 py-2.5">Meals</th>
+                <th className="text-right px-4 py-2.5">Breakfasts</th>
                 <th className="text-right px-4 py-2.5">Snack Bites</th>
                 <th className="text-right px-4 py-2.5">Events</th>
               </tr>
@@ -122,6 +123,7 @@ function ProjectionsTab({ range }) {
                 <tr key={w.weekStart}>
                   <td className="px-4 py-3 font-medium text-slate-700">{formatWeekRange(w.weekStart, w.weekEnd)}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{w.totalMeals}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{w.totalBreakfasts}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{w.totalSnackBites}</td>
                   <td className="px-4 py-3 text-right text-slate-400">{w.eventCount}</td>
                 </tr>
@@ -146,7 +148,7 @@ function BagTagsTab({ range }) {
 
   const rangeEvents = events.filter((e) => {
     const d = new Date(e.date);
-    return d >= range.start && d < addDays(range.end, 1) && ((e.samplesNeeded || 0) > 0 || (e.snackBitesNeeded || 0) > 0);
+    return d >= range.start && d < addDays(range.end, 1) && ((e.samplesNeeded || 0) > 0 || (e.breakfastsNeeded || 0) > 0 || (e.snackBitesNeeded || 0) > 0);
   });
 
   // Default-select events that have a deliver-to location; leave ones missing it unchecked.
@@ -166,7 +168,7 @@ function BagTagsTab({ range }) {
   const handlePrint = () => {
     const chosen = rangeEvents.filter((e) => selected[e.id]);
     const tags = chosen.flatMap((e) => {
-      const bags = computeBags(e.samplesNeeded, e.snackBitesNeeded);
+      const bags = computeBags(e.samplesNeeded, e.breakfastsNeeded, e.snackBitesNeeded);
       return bags.map((bag, i) => ({
         title: e.title,
         pickupLocation: e.pickupLocation || '',
@@ -174,6 +176,7 @@ function BagTagsTab({ range }) {
         bagIndex: i + 1,
         bagCount: bags.length,
         meals: bag.meals,
+        breakfasts: bag.breakfasts,
         snackBites: bag.snackBites,
       }));
     });
@@ -197,11 +200,11 @@ function BagTagsTab({ range }) {
       </div>
 
       {rangeEvents.length === 0 ? (
-        <Card className="p-8"><EmptyState icon="🏷️" title="No events need bag tags in this range" description="Events show up here once they have sample meals or snack bites set" /></Card>
+        <Card className="p-8"><EmptyState icon="🏷️" title="No events need bag tags in this range" description="Events show up here once they have sample meals, breakfasts, or snack bites set" /></Card>
       ) : (
         <Card className="divide-y divide-slate-50">
           {rangeEvents.map((e) => {
-            const bags = computeBags(e.samplesNeeded, e.snackBitesNeeded);
+            const bags = computeBags(e.samplesNeeded, e.breakfastsNeeded, e.snackBitesNeeded);
             return (
               <label key={e.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50">
                 <input
@@ -225,6 +228,7 @@ function BagTagsTab({ range }) {
                 </div>
                 <div className="text-xs text-slate-500 text-right shrink-0">
                   {e.samplesNeeded ? <div>{e.samplesNeeded} meals</div> : null}
+                  {e.breakfastsNeeded ? <div>{e.breakfastsNeeded} breakfasts</div> : null}
                   {e.snackBitesNeeded ? <div>{e.snackBitesNeeded} snacks</div> : null}
                   <div className="font-semibold text-slate-700 mt-0.5">{bags.length} bag{bags.length !== 1 ? 's' : ''}</div>
                 </div>

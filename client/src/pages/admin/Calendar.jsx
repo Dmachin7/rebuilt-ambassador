@@ -317,11 +317,13 @@ export default function AdminCalendar() {
                         → {ev.pickupLocation}
                       </div>
                     )}
-                    {(ev.samplesNeeded || ev.snackBitesNeeded) && (
+                    {(ev.samplesNeeded || ev.breakfastsNeeded || ev.snackBitesNeeded) && (
                       <div className="text-slate-600 mt-0.5">
-                        {ev.samplesNeeded ? `📦 ${ev.samplesNeeded} meals` : ''}
-                        {ev.samplesNeeded && ev.snackBitesNeeded ? ' · ' : ''}
-                        {ev.snackBitesNeeded ? `🍬 ${ev.snackBitesNeeded} snacks` : ''}
+                        {[
+                          ev.samplesNeeded ? `📦 ${ev.samplesNeeded} meals` : '',
+                          ev.breakfastsNeeded ? `🍳 ${ev.breakfastsNeeded} breakfasts` : '',
+                          ev.snackBitesNeeded ? `🍬 ${ev.snackBitesNeeded} snacks` : '',
+                        ].filter(Boolean).join(' · ')}
                       </div>
                     )}
                     <div className={`mt-0.5 px-1 py-0.5 rounded font-medium ${
@@ -352,9 +354,10 @@ export default function AdminCalendar() {
                 {selected.pickupLocation && (
                   <div className="flex items-start gap-1.5">📦 Deliver to: {selected.pickupLocation}</div>
                 )}
-                {(selected.samplesNeeded || selected.snackBitesNeeded) && (
+                {(selected.samplesNeeded || selected.breakfastsNeeded || selected.snackBitesNeeded) && (
                   <div className="flex gap-3">
                     {selected.samplesNeeded && <span>{selected.samplesNeeded} meals</span>}
+                    {selected.breakfastsNeeded && <span>{selected.breakfastsNeeded} breakfasts</span>}
                     {selected.snackBitesNeeded && <span>{selected.snackBitesNeeded} snacks</span>}
                   </div>
                 )}

@@ -219,9 +219,10 @@ export default function EventDetail() {
                   <div className="text-xs text-slate-500">Pay rate</div>
                 </div>
               </div>
-              {(event.samplesNeeded || event.snackBitesNeeded) && (
+              {(event.samplesNeeded || event.breakfastsNeeded || event.snackBitesNeeded) && (
                 <div className="flex gap-4 text-slate-600 text-xs">
                   {event.samplesNeeded && <span>📦 {event.samplesNeeded} sample meals</span>}
+                  {event.breakfastsNeeded && <span>🍳 {event.breakfastsNeeded} sample breakfasts</span>}
                   {event.snackBitesNeeded && <span>🍬 {event.snackBitesNeeded} snack bites</span>}
                 </div>
               )}

@@ -84,7 +84,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
     const {
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
-      samplesNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
+      samplesNeeded, breakfastsNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
       milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
       baggedAndSent, baggedByUserId,
     } = req.body;
@@ -117,6 +117,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         breakdownTimeMins: parseInt(breakdownTimeMins) || 30,
         ambassadorsNeeded: totalNeeded,
         samplesNeeded: samplesNeeded ? parseInt(samplesNeeded) : null,
+        breakfastsNeeded: breakfastsNeeded ? parseInt(breakfastsNeeded) : null,
         snackBitesNeeded: snackBitesNeeded ? roundToTen(parseInt(snackBitesNeeded)) : null,
         notes,
         hasImportantNotes: !!hasImportantNotes,
@@ -183,7 +184,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     const {
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
-      samplesNeeded, snackBitesNeeded, notes, status,
+      samplesNeeded, breakfastsNeeded, snackBitesNeeded, notes, status,
       milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
       baggedAndSent, baggedByUserId,
     } = req.body;
@@ -219,6 +220,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (breakdownTimeMins !== undefined) data.breakdownTimeMins = parseInt(breakdownTimeMins);
     if (ambassadorsNeeded !== undefined) data.ambassadorsNeeded = parseInt(ambassadorsNeeded);
     if (samplesNeeded !== undefined) data.samplesNeeded = samplesNeeded ? parseInt(samplesNeeded) : null;
+    if (breakfastsNeeded !== undefined) data.breakfastsNeeded = breakfastsNeeded ? parseInt(breakfastsNeeded) : null;
     if (snackBitesNeeded !== undefined) data.snackBitesNeeded = snackBitesNeeded ? roundToTen(parseInt(snackBitesNeeded)) : null;
     if (notes !== undefined) data.notes = notes;
     if (hasImportantNotes !== undefined) data.hasImportantNotes = !!hasImportantNotes;

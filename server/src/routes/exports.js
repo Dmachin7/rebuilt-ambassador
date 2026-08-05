@@ -20,7 +20,7 @@ function startOfWeekMonday(d) {
 async function weeklyProjections({ start, end } = {}) {
   const where = {
     status: { not: 'CANCELLED' },
-    OR: [{ samplesNeeded: { gt: 0 } }, { snackBitesNeeded: { gt: 0 } }],
+    OR: [{ samplesNeeded: { gt: 0 } }, { breakfastsNeeded: { gt: 0 } }, { snackBitesNeeded: { gt: 0 } }],
   };
   if (start || end) {
     where.date = {};
@@ -34,20 +34,21 @@ async function weeklyProjections({ start, end } = {}) {
 
   const events = await prisma.event.findMany({
     where,
-    select: { date: true, samplesNeeded: true, snackBitesNeeded: true },
+    select: { date: true, samplesNeeded: true, breakfastsNeeded: true, snackBitesNeeded: true },
     orderBy: { date: 'asc' },
   });
 
-  const byWeek = new Map(); // weekStart ISO -> { weekStart, weekEnd, totalMeals, totalSnackBites, eventCount }
+  const byWeek = new Map(); // weekStart ISO -> { weekStart, weekEnd, totalMeals, totalBreakfasts, totalSnackBites, eventCount }
   events.forEach((e) => {
     const weekStart = startOfWeekMonday(e.date);
     const key = weekStart.toISOString();
     if (!byWeek.has(key)) {
       const weekEnd = new Date(weekStart.getTime() + 6 * 86400000);
-      byWeek.set(key, { weekStart, weekEnd, totalMeals: 0, totalSnackBites: 0, eventCount: 0 });
+      byWeek.set(key, { weekStart, weekEnd, totalMeals: 0, totalBreakfasts: 0, totalSnackBites: 0, eventCount: 0 });
     }
     const bucket = byWeek.get(key);
     bucket.totalMeals += e.samplesNeeded || 0;
+    bucket.totalBreakfasts += e.breakfastsNeeded || 0;
     bucket.totalSnackBites += e.snackBitesNeeded || 0;
     bucket.eventCount += 1;
   });
@@ -72,11 +73,12 @@ router.get('/projections/csv', verifyToken, requireRole('ADMIN'), async (req, re
   try {
     const { start, end } = req.query;
     const weeks = await weeklyProjections({ start, end });
-    const headers = ['Week Start', 'Week End', 'Total Meals', 'Total Snack Bites', 'Events'];
+    const headers = ['Week Start', 'Week End', 'Total Meals', 'Total Breakfasts', 'Total Snack Bites', 'Events'];
     const rows = weeks.map((w) => [
       w.weekStart.toISOString().split('T')[0],
       w.weekEnd.toISOString().split('T')[0],
       w.totalMeals,
+      w.totalBreakfasts,
       w.totalSnackBites,
       w.eventCount,
     ]);

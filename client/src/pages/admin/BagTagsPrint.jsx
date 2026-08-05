@@ -97,9 +97,11 @@ export default function BagTagsPrint() {
                 <div className="tag-line" style={{ color: '#b45309' }}>No deliver-to location set</div>
               )}
               <div className="tag-contents">
-                {tag.meals ? `${tag.meals} meals` : ''}
-                {tag.meals && tag.snackBites ? ' · ' : ''}
-                {tag.snackBites ? `${tag.snackBites} snack bites` : ''}
+                {[
+                  tag.meals ? `${tag.meals} meals` : '',
+                  tag.breakfasts ? `${tag.breakfasts} breakfasts` : '',
+                  tag.snackBites ? `${tag.snackBites} snack bites` : '',
+                ].filter(Boolean).join(' · ')}
               </div>
               <div className="tag-date">{formatDate(tag.date)}</div>
             </div>

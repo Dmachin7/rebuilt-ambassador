@@ -286,13 +286,14 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
   }
 });
 
-// DELETE /api/events/:id — admin only
-router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
+// DELETE /api/events/:id — admin or event coordinator, matching create/update below
+router.delete('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
     await prisma.event.delete({ where: { id: req.params.id } });
     res.json({ message: 'Event deleted' });
   } catch (err) {
     console.error(err);
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Event not found' });
     res.status(500).json({ error: 'Server error' });
   }
 });

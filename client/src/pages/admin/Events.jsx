@@ -61,8 +61,12 @@ export default function AdminEvents() {
   const handleDelete = async (e, id) => {
     e.preventDefault();
     if (!confirm('Delete this event? All shifts and messages will also be deleted.')) return;
-    await eventsAPI.delete(id);
-    load();
+    try {
+      await eventsAPI.delete(id);
+      load();
+    } catch (err) {
+      alert('Failed to delete event: ' + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;

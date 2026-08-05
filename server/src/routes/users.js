@@ -17,7 +17,7 @@ router.get('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (r
       where,
       select: {
         id: true, email: true, role: true, firstName: true, lastName: true,
-        phone: true, isAvailable: true, lifetimeSalesCount: true, createdAt: true,
+        phone: true, isAvailable: true, lifetimeSalesCount: true, isVolunteer: true, createdAt: true,
       },
       orderBy: [{ role: 'asc' }, { firstName: 'asc' }],
     });
@@ -39,7 +39,7 @@ router.get('/:id', verifyToken, async (req, res) => {
       select: {
         id: true, email: true, role: true, firstName: true, lastName: true,
         phone: true, legalName: true, address: true, isAvailable: true,
-        lifetimeSalesCount: true, createdAt: true,
+        lifetimeSalesCount: true, isVolunteer: true, createdAt: true,
         notifyShiftClaims: true, notifyCheckIns: true, notifyCheckOuts: true,
         notifySalesReports: true, notifyMessages: true, notifyEventRecaps: true,
         notifyDailySummary: true, notifyWeeklySummary: true,
@@ -59,13 +59,31 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (!isAdminOrCoord && req.user.id !== req.params.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const { firstName, lastName, phone, legalName, address } = req.body;
+    const { firstName, lastName, phone, legalName, address, email: rawEmail } = req.body;
     const data = {};
     if (firstName !== undefined) data.firstName = firstName;
     if (lastName !== undefined) data.lastName = lastName;
     if (phone !== undefined) data.phone = phone;
     if (legalName !== undefined) data.legalName = legalName;
     if (address !== undefined) data.address = address;
+
+    if (rawEmail !== undefined) {
+      const email = rawEmail.toLowerCase().trim();
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing && existing.id !== req.params.id) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      data.email = email;
+    }
+
+    // Whether this ambassador should ever generate a Payment record — admin/coord only.
+    if (isAdminOrCoord && typeof req.body.isVolunteer === 'boolean') {
+      data.isVolunteer = req.body.isVolunteer;
+    }
+    // Prior-sales stat is an administrative note about the ambassador, not self-editable.
+    if (isAdminOrCoord && typeof req.body.lifetimeSalesCount === 'number') {
+      data.lifetimeSalesCount = Math.max(0, req.body.lifetimeSalesCount);
+    }
 
     // Notification preferences are personal — only editable on your own account, even for admins.
     if (req.user.id === req.params.id) {
@@ -81,12 +99,15 @@ router.put('/:id', verifyToken, async (req, res) => {
     const user = await prisma.user.update({ where: { id: req.params.id }, data });
     res.json({
       id: user.id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName,
+      phone: user.phone, legalName: user.legalName, address: user.address,
+      isVolunteer: user.isVolunteer, lifetimeSalesCount: user.lifetimeSalesCount,
       notifyShiftClaims: user.notifyShiftClaims, notifyCheckIns: user.notifyCheckIns,
       notifyCheckOuts: user.notifyCheckOuts, notifySalesReports: user.notifySalesReports,
       notifyMessages: user.notifyMessages, notifyEventRecaps: user.notifyEventRecaps,
       notifyDailySummary: user.notifyDailySummary, notifyWeeklySummary: user.notifyWeeklySummary,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -147,7 +168,7 @@ router.delete('/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
 // POST /api/users — create a Brand Ambassador (admin or coord) or Event Coordinator (admin only)
 router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (req, res) => {
   try {
-    const { email: rawEmail, password, firstName, lastName, phone, lifetimeSalesCount, role: requestedRole } = req.body;
+    const { email: rawEmail, password, firstName, lastName, phone, lifetimeSalesCount, isVolunteer, role: requestedRole } = req.body;
 
     const isCoordinator = requestedRole === 'EVENT_COORDINATOR';
     const isAdmin = requestedRole === 'ADMIN';
@@ -182,11 +203,12 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         phone: phone || null,
         role,
         lifetimeSalesCount: role === 'AMBASSADOR' && typeof lifetimeSalesCount === 'number' && lifetimeSalesCount > 0 ? lifetimeSalesCount : 0,
+        isVolunteer: role === 'AMBASSADOR' && isVolunteer === true,
         resetToken: hashedToken,
         resetTokenExpiry: tokenExpiry,
       },
       select: {
-        id: true, email: true, role: true, firstName: true, lastName: true, phone: true, lifetimeSalesCount: true, createdAt: true,
+        id: true, email: true, role: true, firstName: true, lastName: true, phone: true, lifetimeSalesCount: true, isVolunteer: true, createdAt: true,
       },
     });
 

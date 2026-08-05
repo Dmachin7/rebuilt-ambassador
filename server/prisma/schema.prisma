@@ -52,6 +52,10 @@ model User {
   isAvailable        Boolean @default(true)
   lifetimeSalesCount Int     @default(0)
 
+  // Volunteer ambassadors work shifts but should never generate a Payment record —
+  // checked before any Payment is created in the checkout / admin-times routes.
+  isVolunteer Boolean @default(false)
+
   // 1099 fields — encrypt ssnPlaceholder before storing in production
   legalName      String?
   address        String?

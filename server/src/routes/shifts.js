@@ -336,7 +336,10 @@ router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res
 // POST /api/shifts/:id/checkout
 router.post('/:id/checkout', verifyToken, async (req, res) => {
   try {
-    const shift = await prisma.shift.findUnique({ where: { id: req.params.id }, include: { event: true } });
+    const shift = await prisma.shift.findUnique({
+      where: { id: req.params.id },
+      include: { event: true, ambassador: { select: { isVolunteer: true } } },
+    });
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     if (shift.ambassadorId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Not your shift' });
@@ -353,7 +356,7 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     });
 
     const existingPayment = await prisma.payment.findUnique({ where: { shiftId: shift.id } });
-    if (!existingPayment) {
+    if (!existingPayment && !shift.ambassador?.isVolunteer) {
       await prisma.payment.create({
         data: {
           shiftId: shift.id,
@@ -391,7 +394,10 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
 // For backfilling shifts from events where an ambassador couldn't check in through the app.
 router.put('/:id/admin-times', verifyToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const shift = await prisma.shift.findUnique({ where: { id: req.params.id }, include: { event: true } });
+    const shift = await prisma.shift.findUnique({
+      where: { id: req.params.id },
+      include: { event: true, ambassador: { select: { isVolunteer: true } } },
+    });
     if (!shift) return res.status(404).json({ error: 'Shift not found' });
     if (!shift.ambassadorId) return res.status(400).json({ error: 'Shift has no ambassador assigned' });
 
@@ -426,7 +432,7 @@ router.put('/:id/admin-times', verifyToken, requireRole('ADMIN'), async (req, re
       const existingPayment = await prisma.payment.findUnique({ where: { shiftId: shift.id } });
       if (existingPayment) {
         await prisma.payment.update({ where: { shiftId: shift.id }, data: { hoursWorked, amount } });
-      } else {
+      } else if (!shift.ambassador?.isVolunteer) {
         await prisma.payment.create({
           data: { shiftId: shift.id, ambassadorId: shift.ambassadorId, hoursWorked, amount, status: 'PENDING' },
         });

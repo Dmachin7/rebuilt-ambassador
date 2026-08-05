@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { usersAPI, shiftsAPI } from '../../api/index.js';
 import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours } from '../../utils/formatters.js';
-import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2, CalendarClock } from 'lucide-react';
+import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2, CalendarClock, Pencil } from 'lucide-react';
 
 function AddAmbassadorModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '', lifetimeSalesCount: 0 });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '', lifetimeSalesCount: 0, isVolunteer: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -110,6 +110,15 @@ function AddAmbassadorModal({ onClose, onCreated }) {
               />
               <p className="text-xs text-slate-400 mt-1">Sales this ambassador made before joining this platform.</p>
             </div>
+            <label className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isVolunteer}
+                onChange={(e) => setForm({ ...form, isVolunteer: e.target.checked })}
+                className="accent-mint-600"
+              />
+              <span className="text-sm text-slate-700">Volunteer — never generate a paycheck for this ambassador</span>
+            </label>
             <div className="flex gap-3 pt-1">
               <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
               <Button type="submit" className="flex-1" disabled={saving}>
@@ -123,11 +132,105 @@ function AddAmbassadorModal({ onClose, onCreated }) {
   );
 }
 
+function EditAmbassadorModal({ ambassador, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    firstName: ambassador.firstName,
+    lastName: ambassador.lastName,
+    email: ambassador.email,
+    phone: ambassador.phone || '',
+    lifetimeSalesCount: ambassador.lifetimeSalesCount || 0,
+    isVolunteer: !!ambassador.isVolunteer,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!form.firstName || !form.lastName || !form.email) {
+      setError('First name, last name, and email are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await usersAPI.update(ambassador.id, form);
+      onSaved({ ...ambassador, ...updated });
+    } catch (err) {
+      setError(err.message || 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-800">Edit {ambassador.firstName} {ambassador.lastName}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-lg">{error}</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">First Name *</label>
+              <input className="input-field text-sm" value={form.firstName} onChange={f('firstName')} />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Last Name *</label>
+              <input className="input-field text-sm" value={form.lastName} onChange={f('lastName')} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Email *</label>
+            <input type="email" className="input-field text-sm" value={form.email} onChange={f('email')} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Phone</label>
+            <input type="tel" className="input-field text-sm" value={form.phone} onChange={f('phone')} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Prior Sales</label>
+            <input
+              type="number"
+              min="0"
+              className="input-field text-sm"
+              value={form.lifetimeSalesCount}
+              onChange={(e) => setForm({ ...form, lifetimeSalesCount: parseInt(e.target.value, 10) || 0 })}
+            />
+          </div>
+          <label className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isVolunteer}
+              onChange={(e) => setForm({ ...form, isVolunteer: e.target.checked })}
+              className="accent-mint-600"
+            />
+            <span className="text-sm text-slate-700">Volunteer — never generate a paycheck for this ambassador</span>
+          </label>
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAmbassadors() {
   const [ambassadors, setAmbassadors] = useState([]);
   const [hours, setHours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingAmb, setEditingAmb] = useState(null); // ambassador object being edited
   const [confirmDelete, setConfirmDelete] = useState(null); // ambassador object to delete
   const [deleting, setDeleting] = useState(false);
 
@@ -145,6 +248,11 @@ export default function AdminAmbassadors() {
   const handleCreated = (newUser) => {
     setAmbassadors((prev) => [newUser, ...prev]);
     setShowAddModal(false);
+  };
+
+  const handleSaved = (updated) => {
+    setAmbassadors((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    setEditingAmb(null);
   };
 
   const handleDelete = async () => {
@@ -200,6 +308,11 @@ export default function AdminAmbassadors() {
                       <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${amb.isAvailable ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                         {amb.isAvailable ? 'Available' : 'Unavailable'}
                       </span>
+                      {amb.isVolunteer && (
+                        <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                          Volunteer
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -243,6 +356,13 @@ export default function AdminAmbassadors() {
                 </Link>
 
                 <button
+                  onClick={() => setEditingAmb(amb)}
+                  className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-mint-600 hover:bg-mint-50 rounded-lg py-1.5 transition"
+                >
+                  <Pencil size={12} /> Edit Details
+                </button>
+
+                <button
                   onClick={() => setConfirmDelete(amb)}
                   className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
                 >
@@ -258,6 +378,14 @@ export default function AdminAmbassadors() {
         <AddAmbassadorModal
           onClose={() => setShowAddModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {editingAmb && (
+        <EditAmbassadorModal
+          ambassador={editingAmb}
+          onClose={() => setEditingAmb(null)}
+          onSaved={handleSaved}
         />
       )}
 

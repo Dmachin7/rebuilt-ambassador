@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { usersAPI } from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
-import { Phone, Mail, UserPlus, X, Trash2, Copy, Check } from 'lucide-react';
+import { Phone, Mail, UserPlus, X, Trash2, Copy, Check, Pencil } from 'lucide-react';
 
 function InviteModal({ role, onClose, onCreated }) {
   const isAdmin = role === 'ADMIN';
@@ -120,7 +120,78 @@ function InviteModal({ role, onClose, onCreated }) {
   );
 }
 
-function StaffCard({ person, roleLabel, accentClass, onDelete, isSelf }) {
+function EditStaffModal({ person, roleLabel, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    firstName: person.firstName,
+    lastName: person.lastName,
+    email: person.email,
+    phone: person.phone || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const f = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!form.firstName || !form.lastName || !form.email) {
+      setError('First name, last name, and email are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await usersAPI.update(person.id, form);
+      onSaved({ ...person, ...updated });
+    } catch (err) {
+      setError(err.message || 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-800">Edit {roleLabel}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-lg">{error}</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">First Name *</label>
+              <input className="input-field text-sm" value={form.firstName} onChange={f('firstName')} />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Last Name *</label>
+              <input className="input-field text-sm" value={form.lastName} onChange={f('lastName')} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Email *</label>
+            <input type="email" className="input-field text-sm" value={form.email} onChange={f('email')} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Phone</label>
+            <input type="tel" className="input-field text-sm" value={form.phone} onChange={f('phone')} />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function StaffCard({ person, roleLabel, accentClass, onDelete, onEdit, isSelf }) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-3 mb-3">
@@ -148,10 +219,16 @@ function StaffCard({ person, roleLabel, accentClass, onDelete, isSelf }) {
       <div className="text-xs text-slate-400">
         Added {new Date(person.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
       </div>
+      <button
+        onClick={() => onEdit(person)}
+        className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-mint-600 hover:bg-mint-50 rounded-lg py-1.5 transition"
+      >
+        <Pencil size={12} /> Edit Details
+      </button>
       {!isSelf && (
         <button
           onClick={() => onDelete(person)}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
+          className="mt-1.5 w-full flex items-center justify-center gap-1.5 text-xs text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg py-1.5 transition"
         >
           <Trash2 size={13} /> Remove
         </button>
@@ -166,6 +243,7 @@ export default function AdminStaff() {
   const [coordinators, setCoordinators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(null); // 'ADMIN' | 'EVENT_COORDINATOR' | null
+  const [editingPerson, setEditingPerson] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -182,6 +260,12 @@ export default function AdminStaff() {
   const handleCreated = (newUser) => {
     if (newUser.role === 'ADMIN') setAdmins((prev) => [newUser, ...prev]);
     else setCoordinators((prev) => [newUser, ...prev]);
+  };
+
+  const handleSaved = (updated) => {
+    if (updated.role === 'ADMIN') setAdmins((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    else setCoordinators((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setEditingPerson(null);
   };
 
   const handleDelete = async () => {
@@ -232,6 +316,7 @@ export default function AdminStaff() {
                 roleLabel="Admin"
                 accentClass="bg-purple-100 text-purple-700"
                 onDelete={setConfirmDelete}
+                onEdit={setEditingPerson}
                 isSelf={a.id === currentUser?.id}
               />
             ))}
@@ -263,6 +348,7 @@ export default function AdminStaff() {
                 roleLabel="Event Coordinator"
                 accentClass="bg-blue-100 text-blue-700"
                 onDelete={setConfirmDelete}
+                onEdit={setEditingPerson}
                 isSelf={false}
               />
             ))}
@@ -275,6 +361,15 @@ export default function AdminStaff() {
           role={addModal}
           onClose={() => setAddModal(null)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {editingPerson && (
+        <EditStaffModal
+          person={editingPerson}
+          roleLabel={editingPerson.role === 'ADMIN' ? 'Admin' : 'Event Coordinator'}
+          onClose={() => setEditingPerson(null)}
+          onSaved={handleSaved}
         />
       )}
 

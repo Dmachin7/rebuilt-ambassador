@@ -13,7 +13,8 @@ import AdminEvents from './pages/admin/Events.jsx';
 import EventDetail from './pages/admin/EventDetail.jsx';
 import AdminCalendar from './pages/admin/Calendar.jsx';
 import AdminAmbassadors from './pages/admin/Ambassadors.jsx';
-import AdminReports from './pages/admin/Reports.jsx';
+import AdminCheckoutSummary from './pages/admin/CheckoutSummary.jsx';
+import AdminAnalytics from './pages/admin/Analytics.jsx';
 import AdminPayroll from './pages/admin/Payroll.jsx';
 import AdminMessages from './pages/admin/Messages.jsx';
 import AdminLeaderboard from './pages/admin/Leaderboard.jsx';
@@ -88,8 +89,9 @@ export default function App() {
             <Route path="calendar" element={<AdminCalendar />} />
             <Route path="ambassadors" element={<AdminAmbassadors />} />
             <Route path="availability" element={<AdminAvailability />} />
-            {/* Payroll, Reports, and Staff — Admin only */}
-            <Route path="reports" element={<AdminOnlyRoute><AdminReports /></AdminOnlyRoute>} />
+            {/* Payroll, Checkout Summary, Analytics, and Staff — Admin only */}
+            <Route path="checkout-summary" element={<AdminOnlyRoute><AdminCheckoutSummary /></AdminOnlyRoute>} />
+            <Route path="analytics" element={<AdminOnlyRoute><AdminAnalytics /></AdminOnlyRoute>} />
             <Route path="payroll" element={<AdminOnlyRoute><AdminPayroll /></AdminOnlyRoute>} />
             <Route path="staff" element={<AdminOnlyRoute><AdminStaff /></AdminOnlyRoute>} />
             <Route path="exports" element={<AdminOnlyRoute><AdminExports /></AdminOnlyRoute>} />

@@ -134,3 +134,13 @@ export const exportsAPI = {
     );
   },
 };
+
+// Analytics
+export const analyticsAPI = {
+  cac: (start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.get(`/analytics/cac${params.length ? `?${params.join('&')}` : ''}`);
+  },
+};

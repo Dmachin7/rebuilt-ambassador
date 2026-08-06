@@ -6,7 +6,7 @@ import { CheckCircle2, Trash2 } from 'lucide-react';
 
 const MILEAGE_RATE = 0.30; // matches server/src/config/constants.js
 
-export default function AdminReports() {
+export default function AdminCheckoutSummary() {
   const [reports, setReports] = useState([]);
   const [events, setEvents] = useState([]);
   const [filter, setFilter] = useState('');
@@ -61,7 +61,7 @@ export default function AdminReports() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Post-Event Reports</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Checkout Summary</h1>
         <p className="text-sm text-slate-500">{reports.length} reports submitted</p>
       </div>
 

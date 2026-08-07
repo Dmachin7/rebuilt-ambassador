@@ -4,7 +4,6 @@ import { useLocation, Link } from 'react-router-dom';
 const PAGE_SIZE = 10; // 2 cols x 5 rows fits the usable area given the label sheet's margins
 
 const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-const formatTime = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
 function chunk(arr, size) {
   const out = [];
@@ -49,7 +48,6 @@ export default function BagTagsPrint() {
     (initialTags || []).map((t) => ({
       ...t,
       dateText: formatDate(t.date),
-      timeText: formatTime(t.date),
     }))
   );
 
@@ -184,10 +182,8 @@ export default function BagTagsPrint() {
                   {(tag.breakfasts || 0) > 0 && (<><span>·</span><input className="tag-input num-input" type="number" min="0" value={tag.breakfasts || 0} onChange={(e) => updateTag(idx, 'breakfasts', parseInt(e.target.value) || 0)} /><span>breakfasts</span></>)}
                   {(tag.snackBites || 0) > 0 && (<><span>·</span><input className="tag-input num-input" type="number" min="0" value={tag.snackBites || 0} onChange={(e) => updateTag(idx, 'snackBites', parseInt(e.target.value) || 0)} /><span>snack bites</span></>)}
                 </div>
-                <div className="tag-datetime" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <div className="tag-datetime" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <input className="tag-input" style={{ width: '5.5em' }} value={tag.dateText} onChange={(e) => updateTag(idx, 'dateText', e.target.value)} />
-                  <span>·</span>
-                  <input className="tag-input" style={{ width: '4.5em' }} value={tag.timeText} onChange={(e) => updateTag(idx, 'timeText', e.target.value)} />
                 </div>
               </div>
             );

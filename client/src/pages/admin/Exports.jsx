@@ -7,6 +7,7 @@ import { computeBags } from '../../utils/bagTags.js';
 import { MapPin, Download, Printer, AlertTriangle } from 'lucide-react';
 
 const longDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const eventTime = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
 function downloadCsvBlob(filename, csv) {
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -264,7 +265,7 @@ function BagTagsTab({ range }) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-700 truncate">{e.title}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{longDate(e.date)}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{longDate(e.date)} · {eventTime(e.date)}</div>
                   {e.pickupLocation ? (
                     <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <MapPin size={11} className="text-slate-400" /> {e.pickupLocation}

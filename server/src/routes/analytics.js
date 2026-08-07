@@ -50,9 +50,16 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
       const commissionEarned = round2(shifts.reduce((s, sh) => s + verifiedCommission(sh.report?.sales), 0));
       const totalCost = round2(hourlyPay + mileageReimbursement + commissionEarned);
 
+      // On-site hours only (checkin → checkout) — excludes drive time, unlike `hoursWorked`
+      // above which is the full paid amount. This is what "hours to get a sale" should reflect.
+      const onSiteHours = shifts.reduce((s, sh) => {
+        if (!sh.checkinTime || !sh.checkoutTime) return s;
+        return s + (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000;
+      }, 0);
+
       const salesCount = shifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
       const cac = salesCount > 0 ? round2(totalCost / salesCount) : null;
-      const avgHoursPerSale = salesCount > 0 ? round2(hoursWorked / salesCount) : null;
+      const avgHoursPerSale = salesCount > 0 ? round2(onSiteHours / salesCount) : null;
 
       return {
         ambassadorId: amb.id,
@@ -61,6 +68,7 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
         email: amb.email,
         shiftCount: shifts.length,
         hoursWorked: round2(hoursWorked),
+        onSiteHours: round2(onSiteHours),
         totalCost,
         salesCount,
         cac,
@@ -72,13 +80,14 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
       (acc, a) => ({
         shiftCount: acc.shiftCount + a.shiftCount,
         hoursWorked: round2(acc.hoursWorked + a.hoursWorked),
+        onSiteHours: round2(acc.onSiteHours + a.onSiteHours),
         totalCost: round2(acc.totalCost + a.totalCost),
         salesCount: acc.salesCount + a.salesCount,
       }),
-      { shiftCount: 0, hoursWorked: 0, totalCost: 0, salesCount: 0 }
+      { shiftCount: 0, hoursWorked: 0, onSiteHours: 0, totalCost: 0, salesCount: 0 }
     );
     cumulative.cac = cumulative.salesCount > 0 ? round2(cumulative.totalCost / cumulative.salesCount) : null;
-    cumulative.avgHoursPerSale = cumulative.salesCount > 0 ? round2(cumulative.hoursWorked / cumulative.salesCount) : null;
+    cumulative.avgHoursPerSale = cumulative.salesCount > 0 ? round2(cumulative.onSiteHours / cumulative.salesCount) : null;
 
     res.json({
       start: start.toISOString(),
@@ -86,6 +95,52 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
       cumulative,
       perAmbassador: perAmbassador.sort((a, b) => (b.cac ?? -1) - (a.cac ?? -1)),
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/analytics/ambassador-stats — all-time (no date range) avg on-site hours per sale,
+// conversion % (shifts with at least one sale ÷ shifts worked), and lifetime sales total per
+// ambassador, keyed by ambassadorId — for the roster cards on the Ambassadors page.
+router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const ambassadors = await prisma.user.findMany({
+      where: { role: 'AMBASSADOR' },
+      select: {
+        id: true,
+        shifts: {
+          where: { status: 'COMPLETED' },
+          select: {
+            checkinTime: true,
+            checkoutTime: true,
+            report: { select: { totalSales: true } },
+          },
+        },
+      },
+    });
+
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const stats = {};
+    ambassadors.forEach((amb) => {
+      const shifts = amb.shifts;
+      const onSiteHours = shifts.reduce((s, sh) => {
+        if (!sh.checkinTime || !sh.checkoutTime) return s;
+        return s + (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000;
+      }, 0);
+      const salesTotal = shifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
+      const shiftsWithSale = shifts.filter((sh) => (sh.report?.totalSales || 0) > 0).length;
+
+      stats[amb.id] = {
+        shiftCount: shifts.length,
+        salesTotal,
+        avgHoursPerSale: salesTotal > 0 ? round2(onSiteHours / salesTotal) : null,
+        conversionPct: shifts.length > 0 ? round2((shiftsWithSale / shifts.length) * 100) : null,
+      };
+    });
+
+    res.json(stats);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

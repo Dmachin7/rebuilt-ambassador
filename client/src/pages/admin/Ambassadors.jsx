@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { usersAPI, shiftsAPI } from '../../api/index.js';
+import { usersAPI, shiftsAPI, analyticsAPI } from '../../api/index.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { Card, Button, Spinner, EmptyState } from '../../components/ui/index.jsx';
 import { formatCurrency, formatHours } from '../../utils/formatters.js';
 import { Phone, Mail, UserPlus, X, Eye, EyeOff, Trash2, CalendarClock, Pencil } from 'lucide-react';
@@ -226,8 +227,11 @@ function EditAmbassadorModal({ ambassador, onClose, onSaved }) {
 }
 
 export default function AdminAmbassadors() {
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'ADMIN';
   const [ambassadors, setAmbassadors] = useState([]);
   const [hours, setHours] = useState([]);
+  const [ambStats, setAmbStats] = useState({}); // ambassadorId -> { avgHoursPerSale, conversionPct, salesTotal } — admin only
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAmb, setEditingAmb] = useState(null); // ambassador object being edited
@@ -235,12 +239,18 @@ export default function AdminAmbassadors() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    Promise.all([usersAPI.list('AMBASSADOR'), shiftsAPI.hours()])
-      .then(([ambs, hrs]) => {
+    Promise.all([
+      usersAPI.list('AMBASSADOR'),
+      shiftsAPI.hours(),
+      isAdmin ? analyticsAPI.ambassadorStats() : Promise.resolve({}),
+    ])
+      .then(([ambs, hrs, stats]) => {
         setAmbassadors(ambs);
         setHours(hrs);
+        setAmbStats(stats);
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getStats = (ambId) => hours.find((h) => h.ambassador?.id === ambId) || { totalHours: 0, totalEarnings: 0, shiftCount: 0 };
@@ -342,6 +352,27 @@ export default function AdminAmbassadors() {
                     <div className="text-xs text-slate-500">Earned</div>
                   </div>
                 </div>
+
+                {isAdmin && ambStats[amb.id] && (
+                  <div className="grid grid-cols-3 gap-2 bg-mint-50 rounded-lg p-3 mb-3">
+                    <div className="text-center">
+                      <div className="text-base font-bold text-slate-800">{ambStats[amb.id].salesTotal}</div>
+                      <div className="text-xs text-slate-500">Sales</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-base font-bold text-slate-800">
+                        {ambStats[amb.id].avgHoursPerSale != null ? formatHours(ambStats[amb.id].avgHoursPerSale) : '—'}
+                      </div>
+                      <div className="text-xs text-slate-500">Hrs/Sale</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-base font-bold text-slate-800">
+                        {ambStats[amb.id].conversionPct != null ? `${ambStats[amb.id].conversionPct}%` : '—'}
+                      </div>
+                      <div className="text-xs text-slate-500">Conversion</div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>Lifetime sales: <span className="font-medium text-slate-600">{amb.lifetimeSalesCount || 0}</span></span>

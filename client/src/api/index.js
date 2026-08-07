@@ -124,4 +124,5 @@ export const analyticsAPI = {
     if (end) params.push(`end=${end}`);
     return api.get(`/analytics/cac${params.length ? `?${params.join('&')}` : ''}`);
   },
+  ambassadorStats: () => api.get('/analytics/ambassador-stats'),
 };

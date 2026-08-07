@@ -214,6 +214,9 @@ function BagTagsTab({ range }) {
   const handlePrint = () => {
     const chosen = rangeEvents.filter((e) => selected[e.id]);
     const tags = chosen.flatMap((e) => {
+      // computeBags only determines how many physical bags/tags this event needs (container
+      // capacity) — each tag still prints the event's full totals, not a per-bag split, since
+      // a tag just labels which location a bag belongs to, not a manifest of what's inside it.
       const bags = computeBags(e.samplesNeeded, e.breakfastsNeeded, e.snackBitesNeeded);
       return bags.map((bag, i) => ({
         title: e.title,
@@ -221,9 +224,9 @@ function BagTagsTab({ range }) {
         date: e.date,
         bagIndex: i + 1,
         bagCount: bags.length,
-        meals: bag.meals,
-        breakfasts: bag.breakfasts,
-        snackBites: bag.snackBites,
+        meals: e.samplesNeeded || 0,
+        breakfasts: e.breakfastsNeeded || 0,
+        snackBites: e.snackBitesNeeded || 0,
       }));
     });
     if (tags.length === 0) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 
 const PAGE_SIZE = 10; // 2 cols x 5 rows fits the usable area given the label sheet's margins
@@ -12,11 +12,36 @@ function chunk(arr, size) {
   return out;
 }
 
+// A wrapping, click-to-edit text block. Plain <input> can't wrap long location/title text onto
+// a second line (it just clips), so this uses contentEditable instead — it behaves like a <div>
+// (wraps, grows) but stays editable. Synced imperatively via ref rather than React children so
+// typing doesn't fight React's reconciliation; the DOM is only touched when `value` changes from
+// outside (e.g. switching tags), not as an echo of our own onBlur commit.
+function EditableText({ value, onCommit, className, style, placeholder }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && ref.current.textContent !== (value || '')) {
+      ref.current.textContent = value || '';
+    }
+  }, [value]);
+  return (
+    <div
+      ref={ref}
+      className={`tag-editable ${className || ''}`}
+      style={style}
+      contentEditable
+      suppressContentEditableWarning
+      data-placeholder={placeholder}
+      onBlur={(e) => onCommit(e.currentTarget.textContent)}
+    />
+  );
+}
+
 // Standalone, chrome-less print page (declared outside AdminLayout in App.jsx) for 3"x2" bag
 // tag labels. Tags are passed via router state from the Exports page's Bag Tags tab — this page
 // doesn't fetch anything itself, so a direct nav/refresh with no state shows a fallback. Fields
-// are editable in place (plain inputs styled to look like print text) so a last-minute typo or
-// count correction doesn't require going back and regenerating the whole batch.
+// are editable in place so a last-minute typo or count correction doesn't require going back and
+// regenerating the whole batch.
 export default function BagTagsPrint() {
   const location = useLocation();
   const initialTags = location.state?.tags;
@@ -84,9 +109,22 @@ export default function BagTagsPrint() {
           overflow: hidden;
         }
         .tag-title { font-weight: 700; font-size: 14pt; color: #38761d; line-height: 1.15; width: 100%; }
+        .tag-bagcount { font-size: 9pt; font-weight: 600; color: #38761d; width: 100%; margin-top: 1px; }
         .tag-line { font-size: 12pt; color: #000; font-weight: 600; margin-top: 3px; width: 100%; }
         .tag-contents { font-size: 10pt; color: #000; margin-top: 14px; font-weight: 600; width: 100%; }
         .tag-datetime { font-size: 6pt; color: #000; margin-top: 2px; width: 100%; }
+
+        .tag-editable {
+          outline: none;
+          width: 100%;
+          padding: 1px 2px;
+          border-radius: 3px;
+          white-space: pre-wrap;
+          overflow-wrap: break-word;
+        }
+        .tag-editable:empty::before { content: attr(data-placeholder); }
+        .tag-editable:hover { background: rgba(59, 184, 137, 0.08); }
+        .tag-editable:focus { background: rgba(59, 184, 137, 0.15); }
 
         .tag-input {
           border: none;
@@ -94,18 +132,16 @@ export default function BagTagsPrint() {
           background: transparent;
           text-align: center;
           font-family: inherit;
-          width: 100%;
           padding: 1px 2px;
           border-radius: 3px;
         }
         .tag-input:hover { background: rgba(59, 184, 137, 0.08); }
         .tag-input:focus { background: rgba(59, 184, 137, 0.15); }
-        .tag-input.contents-input { text-align: center; }
         .tag-input.num-input { width: 2.4em; text-align: right; }
         .tag-input.num-input::-webkit-inner-spin-button,
         .tag-input.num-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         @media print {
-          .tag-input { background: transparent !important; }
+          .tag-input, .tag-editable { background: transparent !important; }
         }
       `}</style>
 
@@ -127,20 +163,20 @@ export default function BagTagsPrint() {
             const idx = pi * PAGE_SIZE + ti;
             return (
               <div className="tag-cell" key={idx}>
-                <div className="tag-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                  <input
-                    className="tag-input"
-                    value={tag.title}
-                    onChange={(e) => updateTag(idx, 'title', e.target.value)}
-                  />
-                  {tag.bagCount > 1 && <span style={{ whiteSpace: 'nowrap' }}>({`Bag ${tag.bagIndex} of ${tag.bagCount}`})</span>}
-                </div>
-                <input
-                  className="tag-input tag-line"
-                  style={tag.pickupLocation ? undefined : { color: '#b45309' }}
+                <EditableText
+                  className="tag-title"
+                  value={tag.title}
+                  onCommit={(v) => updateTag(idx, 'title', v)}
+                />
+                {tag.bagCount > 1 && (
+                  <div className="tag-bagcount">Bag {tag.bagIndex} of {tag.bagCount}</div>
+                )}
+                <EditableText
+                  className="tag-line"
                   value={tag.pickupLocation || ''}
                   placeholder="No deliver-to location set"
-                  onChange={(e) => updateTag(idx, 'pickupLocation', e.target.value)}
+                  style={tag.pickupLocation ? undefined : { color: '#b45309' }}
+                  onCommit={(v) => updateTag(idx, 'pickupLocation', v)}
                 />
                 <div className="tag-contents" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
                   <input className="tag-input num-input" type="number" min="0" value={tag.meals || 0} onChange={(e) => updateTag(idx, 'meals', parseInt(e.target.value) || 0)} />

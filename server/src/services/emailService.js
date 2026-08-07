@@ -238,6 +238,23 @@ async function sendSalesVerificationEmail(staffEmails, event, ambassador, report
   });
 }
 
+async function sendSentToLocationEmail(ambassador, event) {
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#2d6a4f">📦 Food's on its way: ${event.title}</h2>
+      <p style="color:#555">Hey ${ambassador.firstName}, the samples for your event have been bagged and sent to the pickup location.</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        ${event.pickupLocation ? `<p style="margin:6px 0;color:#333"><strong>Pickup Location:</strong> ${event.pickupLocation}</p>` : ''}
+      </div>
+      <p style="color:#555">Log in to <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">your dashboard</a> for full event details.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
+    </div>
+  `;
+  await send({ to: ambassador.email, subject: `Food's Ready for Pickup: ${event.title}`, html });
+}
+
 async function sendCheckInNotificationEmail(adminEmails, ambassador, event) {
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
@@ -344,4 +361,5 @@ module.exports = {
   sendSalesVerificationEmail,
   sendCheckInNotificationEmail,
   sendCheckoutNotificationEmail,
+  sendSentToLocationEmail,
 };

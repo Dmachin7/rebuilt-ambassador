@@ -116,25 +116,6 @@ export const availabilityAPI = {
   setFor: (userId, days) => api.put(`/availability/${userId}`, { days }),
 };
 
-// Exports
-export const exportsAPI = {
-  projections: (start, end) => {
-    const params = [];
-    if (start) params.push(`start=${start}`);
-    if (end) params.push(`end=${end}`);
-    return api.get(`/exports/projections${params.length ? `?${params.join('&')}` : ''}`);
-  },
-  projectionsCsv: (start, end) => {
-    const params = [];
-    if (start) params.push(`start=${start}`);
-    if (end) params.push(`end=${end}`);
-    return api.downloadCsv(
-      `/exports/projections/csv${params.length ? `?${params.join('&')}` : ''}`,
-      `rebuilt-projections-${new Date().toISOString().split('T')[0]}.csv`
-    );
-  },
-};
-
 // Analytics
 export const analyticsAPI = {
   cac: (start, end) => {

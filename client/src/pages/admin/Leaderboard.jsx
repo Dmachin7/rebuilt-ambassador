@@ -14,7 +14,7 @@ function PointsBreakdown({ entry }) {
     ['Strong Performance ×7', `${entry.strongPerformance} promos`, entry.strongPerformance * 7, 'text-green-600'],
     ['Weekly Benchmark ×15', `${entry.weeklyBenchmarks} weeks`, entry.weeklyBenchmarks * 15, 'text-green-600'],
     ['Retention Penalty ×−2', `${entry.retentionPenalty} cancellations`, -entry.retentionPenalty * 2, entry.retentionPenalty > 0 ? 'text-red-500' : 'text-slate-400'],
-    ['Avg Meals/Sale Bonus', `${entry.avgMealsPerSale.toFixed(1)} avg`, quality, quality > 0 ? 'text-green-600' : 'text-slate-400'],
+    ['Avg Entrees/Sale Bonus', `${entry.avgMealsPerSale.toFixed(1)} avg`, quality, quality > 0 ? 'text-green-600' : 'text-slate-400'],
   ];
   return (
     <div className="mt-2 text-xs space-y-1">
@@ -83,9 +83,9 @@ export default function AdminLeaderboard() {
           <div>✓ No-zero promo: +5 pts each</div>
           <div>✓ 3+ sales promo: +7 pts each</div>
           <div>✓ Week with 10+ sales: +15 pts</div>
-          <div>✓ Avg 7–7.99 meals/sale: +7 pts</div>
-          <div>✓ Avg 8–8.99 meals/sale: +10 pts</div>
-          <div>✓ Avg 9+ meals/sale: +15 pts</div>
+          <div>✓ Avg 7–7.99 entrees/sale: +7 pts</div>
+          <div>✓ Avg 8–8.99 entrees/sale: +10 pts</div>
+          <div>✓ Avg 9+ entrees/sale: +15 pts</div>
           <div className="text-red-500">✗ Cancellation after 1st order: −2 pts each</div>
         </div>
       </Card>

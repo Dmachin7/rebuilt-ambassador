@@ -166,11 +166,11 @@ export default function ReportForm() {
               <div className={`text-lg font-bold ${avgMeals ? 'text-mint-600' : 'text-slate-300'}`}>
                 {avgMeals || '—'}
               </div>
-              <div className="text-xs text-slate-400">Avg meals/sale</div>
+              <div className="text-xs text-slate-400">Avg entrees/sale</div>
             </div>
           </div>
           <Input
-            label="Total Meals Sold"
+            label="Total Entrees Sold"
             type="number"
             min="0"
             value={form.mealsSold}

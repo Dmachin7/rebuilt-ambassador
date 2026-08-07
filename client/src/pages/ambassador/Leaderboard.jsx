@@ -65,7 +65,7 @@ export default function AmbassadorLeaderboard() {
             </div>
             <div className="bg-white rounded-lg p-2">
               <div className="font-bold text-mint-600">{myEntry.avgMealsPerSale.toFixed(1)}</div>
-              <div className="text-slate-400">Meals/sale</div>
+              <div className="text-slate-400">Entrees/sale</div>
             </div>
           </div>
         </Card>
@@ -95,7 +95,7 @@ export default function AmbassadorLeaderboard() {
                     {entry.user.firstName} {entry.user.lastName}
                     {isMe && <span className="ml-1 text-xs text-mint-500">(you)</span>}
                   </div>
-                  <div className="text-xs text-slate-400">{entry.promosWorked} promos · {entry.avgMealsPerSale.toFixed(1)} avg meals/sale</div>
+                  <div className="text-xs text-slate-400">{entry.promosWorked} promos · {entry.avgMealsPerSale.toFixed(1)} avg entrees/sale</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-bold text-slate-800">{entry.totalPoints}</div>

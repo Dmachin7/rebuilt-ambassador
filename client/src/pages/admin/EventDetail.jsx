@@ -221,7 +221,7 @@ export default function EventDetail() {
               </div>
               {(event.samplesNeeded || event.breakfastsNeeded || event.snackBitesNeeded) && (
                 <div className="flex gap-4 text-slate-600 text-xs">
-                  {event.samplesNeeded && <span>📦 {event.samplesNeeded} sample meals</span>}
+                  {event.samplesNeeded && <span>📦 {event.samplesNeeded} sample entrees</span>}
                   {event.breakfastsNeeded && <span>🍳 {event.breakfastsNeeded} sample breakfasts</span>}
                   {event.snackBitesNeeded && <span>🍬 {event.snackBitesNeeded} snack bites</span>}
                 </div>
@@ -269,7 +269,7 @@ export default function EventDetail() {
                       <span className="text-sm text-slate-400 italic">Open shift</span>
                     )}
                     {shift.report && (
-                      <div className="mt-1 text-xs text-green-600">✓ Report submitted · {shift.report.totalSales} sales · {shift.report.mealsSold} meals sold</div>
+                      <div className="mt-1 text-xs text-green-600">✓ Report submitted · {shift.report.totalSales} sales · {shift.report.mealsSold} entrees sold</div>
                     )}
                     {shift.payment && (
                       <div className="mt-0.5 text-xs text-slate-400">
@@ -321,8 +321,8 @@ export default function EventDetail() {
                       </span>
                       <div className="flex flex-wrap gap-3 text-xs text-slate-500">
                         <span>🛒 {shift.report.totalSales} sales</span>
-                        <span>🍽 {shift.report.mealsSold} meals sold</span>
-                        {shift.report.mealsPerSale && <span>{shift.report.mealsPerSale} meals/sale</span>}
+                        <span>🍽 {shift.report.mealsSold} entrees sold</span>
+                        {shift.report.mealsPerSale && <span>{shift.report.mealsPerSale} entrees/sale</span>}
                       </div>
                     </div>
                     <p className="text-sm text-slate-600">{shift.report.feedback}</p>
@@ -410,7 +410,7 @@ export default function EventDetail() {
             {editingShift.report ? (
               <Card className="p-4">
                 <p className="text-sm font-medium text-slate-700 mb-1">Report already submitted</p>
-                <p className="text-xs text-slate-500">{editingShift.report.totalSales} sales · {editingShift.report.mealsSold} meals sold</p>
+                <p className="text-xs text-slate-500">{editingShift.report.totalSales} sales · {editingShift.report.mealsSold} entrees sold</p>
               </Card>
             ) : (
               <Card className="p-4 space-y-4">
@@ -428,7 +428,7 @@ export default function EventDetail() {
                   rows={2}
                 />
                 <Input
-                  label="Total Meals Sold"
+                  label="Total Entrees Sold"
                   type="number"
                   min="0"
                   value={reportForm.mealsSold}
@@ -439,7 +439,7 @@ export default function EventDetail() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-slate-700">Sales & Commission</p>
-                    <span className="text-xs text-slate-400">{sales.length} sale{sales.length !== 1 ? 's' : ''}{editAvgMeals ? ` · ${editAvgMeals} meals/sale` : ''}</span>
+                    <span className="text-xs text-slate-400">{sales.length} sale{sales.length !== 1 ? 's' : ''}{editAvgMeals ? ` · ${editAvgMeals} entrees/sale` : ''}</span>
                   </div>
                   {sales.length > 0 && (
                     <div className="space-y-2 mb-3">

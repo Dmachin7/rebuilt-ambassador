@@ -5,38 +5,44 @@ import { MapPin } from 'lucide-react';
 import { autocompleteLocation } from '../stubs/maps.js';
 
 const PICKUP_LOCATIONS = [
-  'Rebuilt Downstairs Fridge',
-  'Anytime Fitness Clearwater',
-  'Anytime Fitness Tarpon Springs',
-  'Bayshore Fit',
-  'Burg CrossFit Downtown',
   'Burn Boot Camp Brandon',
-  'Burn Boot Camp South Tampa',
-  'Burn Boot Camp Apollo Beach',
-  'Camp Tampa',
-  'NOEQL',
-  'CrossFit Brooksville',
-  'CrossFit Manatee',
-  'CrosssFit St. Pete',
-  'Elevate St. Pete',
-  'F45 Training Largo East',
+  'Cigar City CrossFit',
+  'F45 Training Lakeland Highlands',
   'F45 Training Riverview',
-  'F45 Wiregrass',
-  'F45 Midtown Tampa',
-  'F45 Training Lakeland Heights',
-  'F45 Training Sarasota UTC',
-  'Fit24 Tampa',
+  'ReBuilt Downstairs Fridge',
+  'Neighborly Care Network',
+  'Bayshore Fit',
+  'Burn Boot Camp South Tampa',
+  'CAMP Tampa',
+  'Perform24 Tampa',
+  'Burg CrossFit Downtown',
+  'CrossFit St. Pete',
+  'Elevate St. Pete',
+  'Sunshine City CrossFit',
+  'CrossFit Aero',
+  'F45 Training Wiregrass',
   'Fit Body Boot Camp - Lutz',
-  'Level Up Westchase',
-  'MAXX Nutrition & Smoothies',
+  'Fit24 Tampa',
+  'Anytime Fitness Clearwater',
+  'F45 Training Largo East',
+  'F45 Training Midtown Tampa',
+  'TrYumph Fitness Largo',
+  'CAMP Tampa 2nd Delivery',
+  'CAMP Tampa 3rd Delivery',
   'Nutrishop South Tampa',
-  'Perform24',
-  'Seven Springs Crossfit',
-  'crossfit AERO',
+  'Lexus',
+  'Anytime Fitness Tarpon Springs',
+  'Level Up Westchase',
+  'Seven Springs CrossFit',
   'Train Harder CrossFit',
-  'TrYumph Fitness',
-  'Sunshine City Crossfit',
+  'Burn Boot Camp Apollo Beach',
+  'CrossFit Manatee',
+  'F45 Training Sarasota UTC',
+  'MAD Nutrition & Smoothies',
+  'CrossFit Brooksville',
 ];
+
+const CUSTOM_LOCATION = '__custom__';
 
 const EMPTY_FORM = {
   title: '', location: '', pickupLocation: '', contactName: '', contactPhone: '', contactEmail: '',
@@ -156,6 +162,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
   const [shifts, setShifts] = useState([]); // edit mode only — existing shifts on this event
   const [expandedShiftId, setExpandedShiftId] = useState(null);
   const [shiftAssignSaving, setShiftAssignSaving] = useState(false);
+  const [pickupCustomMode, setPickupCustomMode] = useState(false);
 
   // Reset the form whenever the modal opens, or the event/date it's editing/prefilling changes.
   useEffect(() => {
@@ -190,10 +197,12 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
       });
       setDistance({ milesFromHq: editingEvent.milesFromHq ?? '', driveTimeMins: editingEvent.driveTimeMins ?? '' });
       setShifts(editingEvent.shifts || []);
+      setPickupCustomMode(!!editingEvent.pickupLocation && !PICKUP_LOCATIONS.includes(editingEvent.pickupLocation));
     } else {
       setForm({ ...EMPTY_FORM, eventDate: initialDate || '' });
       setDistance({ milesFromHq: '', driveTimeMins: '' });
       setShifts([]);
+      setPickupCustomMode(false);
     }
     setAssignMode('open');
     setExpandedShiftId(null);
@@ -306,12 +315,32 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
           onChange={(val) => { set('location')(val); setError(''); }}
         />
 
-        <Select label="Pickup Location" value={form.pickupLocation} onChange={f('pickupLocation')}>
+        <Select
+          label="Pickup Location"
+          value={pickupCustomMode ? CUSTOM_LOCATION : form.pickupLocation}
+          onChange={(e) => {
+            if (e.target.value === CUSTOM_LOCATION) {
+              setPickupCustomMode(true);
+            } else {
+              setPickupCustomMode(false);
+              set('pickupLocation')(e.target.value);
+            }
+          }}
+        >
           <option value="">— Select —</option>
           {PICKUP_LOCATIONS.map((loc) => (
             <option key={loc} value={loc}>{loc}</option>
           ))}
+          <option value={CUSTOM_LOCATION}>Custom...</option>
         </Select>
+        {pickupCustomMode && (
+          <Input
+            value={form.pickupLocation}
+            onChange={f('pickupLocation')}
+            placeholder="Enter a custom pickup location"
+            autoFocus
+          />
+        )}
 
         <div className="rounded-lg p-3 space-y-3 border bg-slate-50 border-slate-200">
           <p className="text-xs text-slate-500">
@@ -359,7 +388,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
 
         <div className="grid grid-cols-3 gap-3">
           <Input
-            label="Sample Meals" type="number" min="0" value={form.samplesNeeded}
+            label="Sample Entrees" type="number" min="0" value={form.samplesNeeded}
             onChange={f('samplesNeeded')} placeholder="Optional" className="no-spinner"
           />
           <Input
@@ -427,7 +456,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
                 onChange={(e) => set('baggedAndSent')(e.target.checked)}
                 className="accent-green-500"
               />
-              <span className="text-sm text-slate-700">Bagged & Sent to Location</span>
+              <span className="text-sm text-slate-700">Sent to Location</span>
             </label>
             <Select label="Bagged By" value={form.baggedByUserId} onChange={f('baggedByUserId')}>
               <option value="">— Select —</option>

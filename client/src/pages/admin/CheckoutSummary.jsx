@@ -69,7 +69,7 @@ export default function AdminCheckoutSummary() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-slate-800">{totalMealsSold}</div>
-          <div className="text-xs text-slate-500 mt-1">Total Meals Sold</div>
+          <div className="text-xs text-slate-500 mt-1">Total Entrees Sold</div>
         </Card>
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-slate-800">{totalSalesCount}</div>
@@ -77,7 +77,7 @@ export default function AdminCheckoutSummary() {
         </Card>
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-mint-600">{avgMeals.toFixed(1)}</div>
-          <div className="text-xs text-slate-500 mt-1">Avg Meals/Sale</div>
+          <div className="text-xs text-slate-500 mt-1">Avg Entrees/Sale</div>
         </Card>
         <Card className={`p-4 text-center ${pendingCount > 0 ? 'border-orange-200 bg-orange-50' : ''}`}>
           <div className={`text-2xl font-bold ${pendingCount > 0 ? 'text-orange-600' : 'text-slate-800'}`}>{pendingCount}</div>
@@ -115,7 +115,7 @@ export default function AdminCheckoutSummary() {
                 <div className="flex gap-4 text-sm">
                   <div className="text-center">
                     <div className="font-bold text-slate-800">{report.mealsSold}</div>
-                    <div className="text-xs text-slate-400">Meals Sold</div>
+                    <div className="text-xs text-slate-400">Entrees Sold</div>
                   </div>
                   <div className="text-center">
                     <div className="font-bold text-slate-800">{report.totalSales}</div>
@@ -124,7 +124,7 @@ export default function AdminCheckoutSummary() {
                   {report.mealsPerSale && (
                     <div className="text-center">
                       <div className="font-bold text-mint-600">{report.mealsPerSale.toFixed(1)}</div>
-                      <div className="text-xs text-slate-400">Meals/Sale</div>
+                      <div className="text-xs text-slate-400">Entrees/Sale</div>
                     </div>
                   )}
                 </div>

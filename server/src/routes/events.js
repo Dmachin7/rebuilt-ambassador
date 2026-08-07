@@ -3,7 +3,7 @@ const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { withArrivalTime } = require('../lib/time');
-const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail } = require('../services/emailService');
+const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail, sendSentToLocationEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -189,7 +189,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       baggedAndSent, baggedByUserId,
     } = req.body;
 
-    const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true } });
+    const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true, baggedAndSent: true } });
 
     const data = {};
     if (title !== undefined) data.title = title;
@@ -260,6 +260,18 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
           await prisma.shift.deleteMany({ where: { id: { in: removable.map((s) => s.id) } } });
         }
       }
+    }
+
+    if (data.baggedAndSent === true && before?.baggedAndSent !== true) {
+      const shiftsWithAmbassadors = await prisma.shift.findMany({
+        where: { eventId: event.id, ambassadorId: { not: null } },
+        include: { ambassador: { select: { firstName: true, lastName: true, email: true } } },
+      });
+      shiftsWithAmbassadors.forEach((s) => {
+        if (s.ambassador) {
+          sendSentToLocationEmail(s.ambassador, event).catch((err) => console.error('[SENT TO LOCATION EMAIL]', err));
+        }
+      });
     }
 
     if (status === 'COMPLETED' && before?.status !== 'COMPLETED') {

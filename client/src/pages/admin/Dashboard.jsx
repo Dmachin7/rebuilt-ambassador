@@ -36,7 +36,7 @@ function EventMetricsPanel({ event, onSave }) {
       <p className="text-xs font-medium text-slate-500 mb-2">Admin Metrics Input</p>
       <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1">
-          <label className="text-xs text-slate-400">Meals Sold</label>
+          <label className="text-xs text-slate-400">Entrees Sold</label>
           <input
             type="number" min="0" value={mealsSold}
             onChange={(e) => setMealsSold(e.target.value)}
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                   <th className="px-4 py-3 text-right">Shifts</th>
                   <th className="px-4 py-3 text-right">Hours</th>
                   {isAdmin && <th className="px-4 py-3 text-right">Earnings</th>}
-                  <th className="px-4 py-3 text-right">Meals Sold</th>
+                  <th className="px-4 py-3 text-right">Entrees Sold</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">

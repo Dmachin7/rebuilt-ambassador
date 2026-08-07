@@ -320,7 +320,7 @@ export default function AdminCalendar() {
                     {(ev.samplesNeeded || ev.breakfastsNeeded || ev.snackBitesNeeded) && (
                       <div className="text-slate-600 mt-0.5">
                         {[
-                          ev.samplesNeeded ? `📦 ${ev.samplesNeeded} meals` : '',
+                          ev.samplesNeeded ? `📦 ${ev.samplesNeeded} entrees` : '',
                           ev.breakfastsNeeded ? `🍳 ${ev.breakfastsNeeded} breakfasts` : '',
                           ev.snackBitesNeeded ? `🍬 ${ev.snackBitesNeeded} snacks` : '',
                         ].filter(Boolean).join(' · ')}
@@ -356,7 +356,7 @@ export default function AdminCalendar() {
                 )}
                 {(selected.samplesNeeded || selected.breakfastsNeeded || selected.snackBitesNeeded) && (
                   <div className="flex gap-3">
-                    {selected.samplesNeeded && <span>{selected.samplesNeeded} meals</span>}
+                    {selected.samplesNeeded && <span>{selected.samplesNeeded} entrees</span>}
                     {selected.breakfastsNeeded && <span>{selected.breakfastsNeeded} breakfasts</span>}
                     {selected.snackBitesNeeded && <span>{selected.snackBitesNeeded} snacks</span>}
                   </div>
@@ -392,18 +392,6 @@ export default function AdminCalendar() {
 
               {/* Quick bagged/sent toggle */}
               <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                <label className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${
-                  selected.baggedAndSent ? 'border-green-400 bg-green-50' : 'border-slate-200 hover:bg-slate-50'
-                } ${bagSaving ? 'opacity-60' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!selected.baggedAndSent}
-                    disabled={bagSaving}
-                    onChange={(e) => applyBagUpdate({ baggedAndSent: e.target.checked })}
-                    className="accent-green-500"
-                  />
-                  <span className="text-slate-700">Bagged & Sent to Location</span>
-                </label>
                 <Select
                   value={selected.baggedByUserId || ''}
                   disabled={bagSaving}
@@ -415,6 +403,18 @@ export default function AdminCalendar() {
                     <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
                   ))}
                 </Select>
+                <label className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${
+                  selected.baggedAndSent ? 'border-green-400 bg-green-50' : 'border-slate-200 hover:bg-slate-50'
+                } ${bagSaving ? 'opacity-60' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!selected.baggedAndSent}
+                    disabled={bagSaving}
+                    onChange={(e) => applyBagUpdate({ baggedAndSent: e.target.checked })}
+                    className="accent-green-500"
+                  />
+                  <span className="text-slate-700">Sent to Location</span>
+                </label>
               </div>
 
               <button

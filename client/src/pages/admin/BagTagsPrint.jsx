@@ -16,7 +16,7 @@ function chunk(arr, size) {
 // (wraps, grows) but stays editable. Synced imperatively via ref rather than React children so
 // typing doesn't fight React's reconciliation; the DOM is only touched when `value` changes from
 // outside (e.g. switching tags), not as an echo of our own onBlur commit.
-function EditableText({ value, onCommit, className, style, placeholder }) {
+function EditableText({ value, onCommit, className, style, placeholder, as: Tag = 'div' }) {
   const ref = useRef(null);
   useEffect(() => {
     if (ref.current && ref.current.textContent !== (value || '')) {
@@ -24,7 +24,7 @@ function EditableText({ value, onCommit, className, style, placeholder }) {
     }
   }, [value]);
   return (
-    <div
+    <Tag
       ref={ref}
       className={`tag-editable ${className || ''}`}
       style={style}
@@ -107,7 +107,8 @@ export default function BagTagsPrint() {
           overflow: hidden;
         }
         .tag-title { font-weight: 700; font-size: 14pt; color: #38761d; line-height: 1.15; width: 100%; }
-        .tag-bagcount { font-size: 9pt; font-weight: 600; color: #38761d; width: 100%; margin-top: 1px; }
+        .tag-title-text { display: inline; }
+        .tag-bagcount-inline { font-size: 11pt; font-weight: 600; }
         .tag-line { font-size: 12pt; color: #000; font-weight: 600; margin-top: 3px; width: 100%; }
         .tag-contents { font-size: 10pt; color: #000; margin-top: 14px; font-weight: 600; width: 100%; }
         .tag-datetime { font-size: 6pt; color: #000; margin-top: 2px; width: 100%; }
@@ -161,14 +162,17 @@ export default function BagTagsPrint() {
             const idx = pi * PAGE_SIZE + ti;
             return (
               <div className="tag-cell" key={idx}>
-                <EditableText
-                  className="tag-title"
-                  value={tag.title}
-                  onCommit={(v) => updateTag(idx, 'title', v)}
-                />
-                {tag.bagCount > 1 && (
-                  <div className="tag-bagcount">Bag {tag.bagIndex} of {tag.bagCount}</div>
-                )}
+                <div className="tag-title">
+                  <EditableText
+                    as="span"
+                    className="tag-title-text"
+                    value={tag.title}
+                    onCommit={(v) => updateTag(idx, 'title', v)}
+                  />
+                  {tag.bagCount > 1 && (
+                    <span className="tag-bagcount-inline"> (Bag {tag.bagIndex} of {tag.bagCount})</span>
+                  )}
+                </div>
                 <EditableText
                   className="tag-line"
                   value={tag.pickupLocation || ''}
@@ -177,10 +181,35 @@ export default function BagTagsPrint() {
                   onCommit={(v) => updateTag(idx, 'pickupLocation', v)}
                 />
                 <div className="tag-contents" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '2px 4px' }}>
-                  <input className="tag-input num-input" type="number" min="0" value={tag.meals || 0} onChange={(e) => updateTag(idx, 'meals', parseInt(e.target.value) || 0)} />
-                  <span>entrees</span>
-                  {(tag.breakfasts || 0) > 0 && (<><span>·</span><input className="tag-input num-input" type="number" min="0" value={tag.breakfasts || 0} onChange={(e) => updateTag(idx, 'breakfasts', parseInt(e.target.value) || 0)} /><span>breakfasts</span></>)}
-                  {(tag.snackBites || 0) > 0 && (<><span>·</span><input className="tag-input num-input" type="number" min="0" value={tag.snackBites || 0} onChange={(e) => updateTag(idx, 'snackBites', parseInt(e.target.value) || 0)} /><span>snack bites</span></>)}
+                  {(() => {
+                    const showMeals = (tag.meals || 0) > 0;
+                    const showBreakfasts = (tag.breakfasts || 0) > 0;
+                    const showSnacks = (tag.snackBites || 0) > 0;
+                    return (
+                      <>
+                        {showMeals && (
+                          <>
+                            <input className="tag-input num-input" type="number" min="0" value={tag.meals || 0} onChange={(e) => updateTag(idx, 'meals', parseInt(e.target.value) || 0)} />
+                            <span>entrees</span>
+                          </>
+                        )}
+                        {showMeals && (showBreakfasts || showSnacks) && <span>&</span>}
+                        {showBreakfasts && (
+                          <>
+                            <input className="tag-input num-input" type="number" min="0" value={tag.breakfasts || 0} onChange={(e) => updateTag(idx, 'breakfasts', parseInt(e.target.value) || 0)} />
+                            <span>breakfasts</span>
+                          </>
+                        )}
+                        {showBreakfasts && showSnacks && <span>&</span>}
+                        {showSnacks && (
+                          <>
+                            <input className="tag-input num-input" type="number" min="0" value={tag.snackBites || 0} onChange={(e) => updateTag(idx, 'snackBites', parseInt(e.target.value) || 0)} />
+                            <span>snack bites</span>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="tag-datetime" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <input className="tag-input" style={{ width: '5.5em' }} value={tag.dateText} onChange={(e) => updateTag(idx, 'dateText', e.target.value)} />

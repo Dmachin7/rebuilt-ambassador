@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -131,14 +131,25 @@ export default function AdminCalendar() {
     };
   });
 
-  const handleEventClick = (info) => {
-    setSelected(info.event.extendedProps.event);
-  };
+  // Native `dblclick` is unreliable here: selecting an event on the first click re-renders
+  // calendarEvents, which can lead FullCalendar to recreate that event's DOM node before the
+  // second click lands — breaking the browser's same-element double-click detection. Tracking
+  // clicks by event id + timestamp instead sidesteps that entirely.
+  const lastClickRef = useRef({ id: null, time: 0 });
 
-  const handleEventDoubleClick = (event) => {
-    setFormEditingEvent(event);
-    setFormInitialDate(null);
-    setFormModalOpen(true);
+  const handleEventClick = (info) => {
+    const event = info.event.extendedProps.event;
+    const now = Date.now();
+    const isDoubleClick = lastClickRef.current.id === event.id && now - lastClickRef.current.time < 400;
+    lastClickRef.current = { id: event.id, time: now };
+
+    if (isDoubleClick) {
+      setFormEditingEvent(event);
+      setFormInitialDate(null);
+      setFormModalOpen(true);
+    } else {
+      setSelected(event);
+    }
   };
 
   const handleDateClick = (info) => {
@@ -286,9 +297,6 @@ export default function AdminCalendar() {
               events={calendarEvents}
               eventClick={handleEventClick}
               dateClick={handleDateClick}
-              eventDidMount={(info) => {
-                info.el.addEventListener('dblclick', () => handleEventDoubleClick(info.event.extendedProps.event));
-              }}
               editable={!isMobile}
               eventDrop={handleEventDrop}
               height="auto"

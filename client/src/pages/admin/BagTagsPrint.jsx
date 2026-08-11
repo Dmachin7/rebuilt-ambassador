@@ -51,15 +51,6 @@ export default function BagTagsPrint() {
     }))
   );
 
-  useEffect(() => {
-    if (tags && tags.length > 0) {
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
-    }
-    // Only auto-print once, on the initial batch — not on every edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const updateTag = (index, field, value) => {
     setTags((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   };
@@ -96,7 +87,7 @@ export default function BagTagsPrint() {
         .tag-cell {
           width: 3in;
           height: 2in;
-          border: 1px solid #999;
+          border: 1.5px solid #999;
           padding: 0.15in 0.18in;
           display: flex;
           flex-direction: column;
@@ -108,7 +99,7 @@ export default function BagTagsPrint() {
         }
         .tag-title { font-weight: 700; font-size: 14pt; color: #38761d; line-height: 1.15; width: 100%; }
         .tag-title-text { display: inline; }
-        .tag-bagcount-inline { font-size: 11pt; font-weight: 600; }
+        .tag-bagcount-inline { font-weight: 700; }
         .tag-line { font-size: 12pt; color: #000; font-weight: 600; margin-top: 3px; width: 100%; }
         .tag-contents { font-size: 10pt; color: #000; margin-top: 14px; font-weight: 600; width: 100%; }
         .tag-datetime { font-size: 6pt; color: #000; margin-top: 2px; width: 100%; }
@@ -170,7 +161,7 @@ export default function BagTagsPrint() {
                     onCommit={(v) => updateTag(idx, 'title', v)}
                   />
                   {tag.bagCount > 1 && (
-                    <span className="tag-bagcount-inline"> (Bag {tag.bagIndex} of {tag.bagCount})</span>
+                    <span className="tag-bagcount-inline"> {tag.bagIndex} of {tag.bagCount}</span>
                   )}
                 </div>
                 <EditableText

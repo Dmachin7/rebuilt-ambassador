@@ -164,7 +164,10 @@ router.delete('/:reportId/sales/:saleId', verifyToken, requireRole('ADMIN'), asy
     await prisma.sale.delete({ where: { id: sale.id } });
 
     const remaining = await prisma.sale.count({ where: { reportId: req.params.reportId } });
-    const report = await prisma.report.findUnique({ where: { id: req.params.reportId } });
+    const report = await prisma.report.findUnique({
+      where: { id: req.params.reportId },
+      include: { shift: { select: { ambassadorId: true } } },
+    });
     const mealsPerSale = remaining > 0 ? Math.round((report.mealsSold / remaining) * 100) / 100 : null;
 
     const updated = await prisma.report.update({
@@ -172,6 +175,22 @@ router.delete('/:reportId/sales/:saleId', verifyToken, requireRole('ADMIN'), asy
       data: { totalSales: remaining, mealsPerSale },
       include: { sales: true },
     });
+
+    // lifetimeSalesCount is incremented on report submission (below) but was never decremented
+    // here, so a removed sale would permanently overcount the ambassador's lifetime sales total.
+    if (report.shift?.ambassadorId) {
+      const ambassador = await prisma.user.findUnique({
+        where: { id: report.shift.ambassadorId },
+        select: { lifetimeSalesCount: true },
+      });
+      if (ambassador && ambassador.lifetimeSalesCount > 0) {
+        await prisma.user.update({
+          where: { id: report.shift.ambassadorId },
+          data: { lifetimeSalesCount: Math.max(0, ambassador.lifetimeSalesCount - 1) },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (err) {
     console.error(err);

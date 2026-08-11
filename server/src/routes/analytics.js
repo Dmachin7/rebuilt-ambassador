@@ -57,7 +57,10 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
         return s + (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000;
       }, 0);
 
-      const salesCount = shifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
+      // Prefer the payroll-corrected sales count (Payment.salesOverride) over the raw reported
+      // total, same as payments.js's withBreakdown/biweekly summary — otherwise a correction made
+      // via Payroll's Edit Breakdown never shows up here since it doesn't touch Sale rows.
+      const salesCount = shifts.reduce((s, sh) => s + (sh.payment?.salesOverride ?? sh.report?.totalSales ?? 0), 0);
       const cac = salesCount > 0 ? round2(totalCost / salesCount) : null;
       const avgHoursPerSale = salesCount > 0 ? round2(onSiteHours / salesCount) : null;
 
@@ -116,12 +119,17 @@ router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, r
             checkinTime: true,
             checkoutTime: true,
             report: { select: { totalSales: true } },
+            payment: { select: { salesOverride: true } },
           },
         },
       },
     });
 
     const round2 = (n) => Math.round(n * 100) / 100;
+    // Prefer the payroll-corrected sales count (Payment.salesOverride) over the raw reported
+    // total — same convention as payments.js, so a correction made via Payroll's Edit Breakdown
+    // shows up here too instead of only in Payroll.
+    const shiftSales = (sh) => sh.payment?.salesOverride ?? sh.report?.totalSales ?? 0;
     const stats = {};
     ambassadors.forEach((amb) => {
       const shifts = amb.shifts;
@@ -129,8 +137,8 @@ router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, r
         if (!sh.checkinTime || !sh.checkoutTime) return s;
         return s + (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000;
       }, 0);
-      const salesTotal = shifts.reduce((s, sh) => s + (sh.report?.totalSales || 0), 0);
-      const shiftsWithSale = shifts.filter((sh) => (sh.report?.totalSales || 0) > 0).length;
+      const salesTotal = shifts.reduce((s, sh) => s + shiftSales(sh), 0);
+      const shiftsWithSale = shifts.filter((sh) => shiftSales(sh) > 0).length;
 
       stats[amb.id] = {
         shiftCount: shifts.length,

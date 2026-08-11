@@ -152,7 +152,16 @@ export default function AdminCalendar() {
     }
   };
 
+  // Same double-click-by-timestamp approach as handleEventClick — a single click on empty
+  // calendar space should do nothing; only a second click within 400ms opens New Event.
+  const lastDateClickRef = useRef({ dateStr: null, time: 0 });
+
   const handleDateClick = (info) => {
+    const now = Date.now();
+    const isDoubleClick = lastDateClickRef.current.dateStr === info.dateStr && now - lastDateClickRef.current.time < 400;
+    lastDateClickRef.current = { dateStr: info.dateStr, time: now };
+    if (!isDoubleClick) return;
+
     setFormEditingEvent(null);
     setFormInitialDate(info.dateStr.slice(0, 10));
     setFormModalOpen(true);
@@ -217,7 +226,7 @@ export default function AdminCalendar() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Event Calendar</h1>
-          <p className="text-sm text-slate-500">Click a date to add an event · double-click an event to edit · drag to reschedule.</p>
+          <p className="text-sm text-slate-500">Double-click empty space to add an event · click an event to preview, double-click to edit · drag to reschedule.</p>
         </div>
         {hasPending && (
           <div className="flex gap-2">

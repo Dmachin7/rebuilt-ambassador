@@ -14,10 +14,13 @@ const upload = multer({ dest: 'uploads/' });
 
 // On-site hours already covers setup time — ambassadors check in when they arrive to set up,
 // not when selling starts — so setup is not added on top here.
-function computePay(checkinTime, checkoutTime, driveTimeMins) {
+// applyMinimum=false skips the MIN_PAID_HOURS floor — used for team meetings, which pay strictly
+// for clocked time rather than guaranteeing a minimum shift length like promo events do.
+function computePay(checkinTime, checkoutTime, driveTimeMins, applyMinimum = true) {
   const onSiteHours = (checkoutTime - checkinTime) / 3600000;
   const driveHours = (driveTimeMins || 0) / 60; // driveTimeMins is already the total round-trip time
-  const hoursWorked = Math.round(Math.max(MIN_PAID_HOURS, onSiteHours + driveHours) * 100) / 100;
+  const rawHours = onSiteHours + driveHours;
+  const hoursWorked = Math.round((applyMinimum ? Math.max(MIN_PAID_HOURS, rawHours) : rawHours) * 100) / 100;
   const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
   return { hoursWorked, amount };
 }
@@ -348,7 +351,7 @@ router.post('/:id/checkout', verifyToken, async (req, res) => {
     if (shift.checkoutTime) return res.status(400).json({ error: 'Already checked out' });
 
     const checkoutTime = new Date();
-    const { hoursWorked, amount } = computePay(shift.checkinTime, checkoutTime, shift.event.driveTimeMins);
+    const { hoursWorked, amount } = computePay(shift.checkinTime, checkoutTime, shift.event.driveTimeMins, !shift.event.isTeamMeeting);
 
     const updated = await prisma.shift.update({
       where: { id: req.params.id },
@@ -428,7 +431,7 @@ router.put('/:id/admin-times', verifyToken, requireRole('ADMIN'), async (req, re
     });
 
     if (parsedCheckin && parsedCheckout) {
-      const { hoursWorked, amount } = computePay(parsedCheckin, parsedCheckout, shift.event.driveTimeMins);
+      const { hoursWorked, amount } = computePay(parsedCheckin, parsedCheckout, shift.event.driveTimeMins, !shift.event.isTeamMeeting);
       const existingPayment = await prisma.payment.findUnique({ where: { shiftId: shift.id } });
       if (existingPayment) {
         await prisma.payment.update({ where: { shiftId: shift.id }, data: { hoursWorked, amount } });

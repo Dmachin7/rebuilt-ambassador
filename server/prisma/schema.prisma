@@ -108,6 +108,9 @@ model Event {
   notes             String?
   hasImportantNotes Boolean     @default(false)
   tentNeeded        Boolean     @default(false)
+  // Team meetings pay strictly for clocked time — the usual MIN_PAID_HOURS floor (see
+  // computePay in shifts.js) is skipped for shifts on an event flagged this way.
+  isTeamMeeting     Boolean     @default(false)
   status            EventStatus @default(UPCOMING)
   totalMealsSold    Int?
   totalSalesInput   Int?

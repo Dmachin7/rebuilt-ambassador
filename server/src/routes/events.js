@@ -85,7 +85,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, breakfastsNeeded, snackBitesNeeded, notes, assignedAmbassadorIds,
-      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
+      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded, isTeamMeeting,
       baggedAndSent, baggedByUserId,
     } = req.body;
 
@@ -122,6 +122,7 @@ router.post('/', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async (
         notes,
         hasImportantNotes: !!hasImportantNotes,
         tentNeeded: !!tentNeeded,
+        isTeamMeeting: !!isTeamMeeting,
         baggedAndSent: !!baggedAndSent,
         baggedByUserId: baggedByUserId || null,
         status: 'UPCOMING',
@@ -185,7 +186,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       title, location, pickupLocation, contactName, contactPhone, contactEmail,
       date, endTime, setupTimeMins, breakdownTimeMins, ambassadorsNeeded,
       samplesNeeded, breakfastsNeeded, snackBitesNeeded, notes, status,
-      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded,
+      milesFromHq, driveTimeMins, hasImportantNotes, tentNeeded, isTeamMeeting,
       baggedAndSent, baggedByUserId,
     } = req.body;
 
@@ -225,6 +226,7 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
     if (notes !== undefined) data.notes = notes;
     if (hasImportantNotes !== undefined) data.hasImportantNotes = !!hasImportantNotes;
     if (tentNeeded !== undefined) data.tentNeeded = !!tentNeeded;
+    if (isTeamMeeting !== undefined) data.isTeamMeeting = !!isTeamMeeting;
     if (baggedAndSent !== undefined) data.baggedAndSent = !!baggedAndSent;
     if (baggedByUserId !== undefined) data.baggedByUserId = baggedByUserId || null;
     if (status !== undefined) data.status = status;

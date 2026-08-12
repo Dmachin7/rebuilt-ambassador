@@ -169,6 +169,11 @@ export default function EventDetail() {
                 ⛺ Tent Needed
               </span>
             )}
+            {event.isTeamMeeting && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                👥 Team Meeting — no 4-hr minimum
+              </span>
+            )}
             {event.milesFromHq && (
               <span className="text-xs text-slate-400">{event.milesFromHq} mi · {event.driveTimeMins} min drive (round-trip)</span>
             )}

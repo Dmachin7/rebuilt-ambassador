@@ -49,7 +49,7 @@ const EMPTY_FORM = {
   eventDate: '', startTime: '', endTime: '',
   setupTimeMins: 15, ambassadorsNeeded: 1,
   samplesNeeded: '', breakfastsNeeded: '', snackBitesNeeded: '', notes: '',
-  hasImportantNotes: false, tentNeeded: false,
+  hasImportantNotes: false, tentNeeded: false, isTeamMeeting: false,
   baggedAndSent: false, baggedByUserId: '',
   assignedAmbassadorIds: [],
 };
@@ -191,6 +191,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
         notes: editingEvent.notes || '',
         hasImportantNotes: editingEvent.hasImportantNotes || false,
         tentNeeded: editingEvent.tentNeeded || false,
+        isTeamMeeting: editingEvent.isTeamMeeting || false,
         baggedAndSent: editingEvent.baggedAndSent || false,
         baggedByUserId: editingEvent.baggedByUserId || '',
         assignedAmbassadorIds: [],
@@ -403,7 +404,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-wrap gap-3">
           <label className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
             form.hasImportantNotes ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50'
           }`}>
@@ -426,10 +427,25 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
             />
             <span className="text-sm text-slate-700">⛺ Tent Needed</span>
           </label>
+          <label
+            title="Pays strictly for clocked in/out time — skips the usual 4-hour minimum shift length"
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+              form.isTeamMeeting ? 'border-purple-400 bg-purple-50' : 'border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={form.isTeamMeeting}
+              onChange={(e) => set('isTeamMeeting')(e.target.checked)}
+              className="accent-purple-500"
+            />
+            <span className="text-sm text-slate-700">👥 Team Meeting</span>
+          </label>
         </div>
 
         <div className="bg-mint-50 rounded-lg px-3 py-2 text-xs text-slate-600">
           💰 Pay rate: <strong>$20/hr</strong> (fixed) — applied to event time, round-trip drive time, and setup time
+          {form.isTeamMeeting && ' (no 4-hour minimum for team meetings — paid for clocked time only)'}
         </div>
 
         <div className="border-t border-slate-100 pt-4">

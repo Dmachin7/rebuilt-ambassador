@@ -271,9 +271,17 @@ router.put('/:id/breakdown', verifyToken, requireRole('ADMIN'), async (req, res)
       }
     }
 
-    const hoursWorked = Math.round(
-      Math.max(MIN_PAID_HOURS, (onSiteHours || 0) + (driveTimeHours || 0)) * 100
-    ) / 100;
+    // Team meetings pay strictly for clocked time — skip the minimum-hours floor for them,
+    // same as the automatic checkout/admin-times calculation in shifts.js.
+    const existing = await prisma.payment.findUnique({
+      where: { id: req.params.id },
+      select: { shift: { select: { event: { select: { isTeamMeeting: true } } } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Payment not found' });
+    const applyMinimum = !existing.shift?.event?.isTeamMeeting;
+
+    const rawHours = (onSiteHours || 0) + (driveTimeHours || 0);
+    const hoursWorked = Math.round((applyMinimum ? Math.max(MIN_PAID_HOURS, rawHours) : rawHours) * 100) / 100;
     const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
     const payment = await prisma.payment.update({

@@ -152,6 +152,8 @@ export default function AdminEvents() {
               ? 'border-l-4 border-l-amber-400'
               : event.tentNeeded
               ? 'border-l-4 border-l-blue-400'
+              : event.isTeamMeeting
+              ? 'border-l-4 border-l-purple-400'
               : '';
             return (
               <Link key={event.id} to={`/admin/events/${event.id}`} className="block">
@@ -160,7 +162,7 @@ export default function AdminEvents() {
                     <h3 className="font-semibold text-slate-800 text-sm leading-tight">{event.title}</h3>
                     <Badge status={event.status} />
                   </div>
-                  {(event.hasImportantNotes || event.tentNeeded) && (
+                  {(event.hasImportantNotes || event.tentNeeded || event.isTeamMeeting) && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {event.hasImportantNotes && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
@@ -170,6 +172,11 @@ export default function AdminEvents() {
                       {event.tentNeeded && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-800">
                           ⛺ Tent Needed
+                        </span>
+                      )}
+                      {event.isTeamMeeting && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-800">
+                          👥 Team Meeting
                         </span>
                       )}
                     </div>

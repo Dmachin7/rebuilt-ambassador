@@ -3,7 +3,7 @@ const prisma = require('../lib/prisma');
 const { verifyToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { withArrivalTime } = require('../lib/time');
-const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail, sendSentToLocationEmail } = require('../services/emailService');
+const { sendPostEventRecapEmail, sendShiftAssignedEmail, sendNewOpenEventEmail, sendSentToLocationEmail, sendEventUpdatedEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -190,7 +190,10 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
       baggedAndSent, baggedByUserId,
     } = req.body;
 
-    const before = await prisma.event.findUnique({ where: { id: req.params.id }, select: { status: true, baggedAndSent: true } });
+    const before = await prisma.event.findUnique({
+      where: { id: req.params.id },
+      select: { status: true, baggedAndSent: true, date: true, endTime: true, location: true },
+    });
 
     const data = {};
     if (title !== undefined) data.title = title;
@@ -262,6 +265,34 @@ router.put('/:id', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATOR'), async
           await prisma.shift.deleteMany({ where: { id: { in: removable.map((s) => s.id) } } });
         }
       }
+    }
+
+    // Notify already-assigned ambassadors when the date/time, end time, or location changes —
+    // one email per event, keyed off this specific event's shifts only, so an ambassador
+    // assigned to two different events at the same place on the same day always gets two
+    // separate emails rather than anything merged.
+    const changedFields = [];
+    if (data.date !== undefined && before && new Date(before.date).getTime() !== data.date.getTime()) {
+      changedFields.push('date/time');
+    }
+    if (data.endTime !== undefined && before) {
+      const beforeEnd = before.endTime ? new Date(before.endTime).getTime() : null;
+      const afterEnd = data.endTime ? data.endTime.getTime() : null;
+      if (beforeEnd !== afterEnd) changedFields.push('end time');
+    }
+    if (data.location !== undefined && before && data.location !== before.location) {
+      changedFields.push('location');
+    }
+    if (changedFields.length > 0) {
+      const shiftsWithAmbassadors = await prisma.shift.findMany({
+        where: { eventId: event.id, ambassadorId: { not: null }, status: { in: ['ASSIGNED', 'CHECKED_IN'] } },
+        include: { ambassador: { select: { firstName: true, lastName: true, email: true } } },
+      });
+      shiftsWithAmbassadors.forEach((s) => {
+        if (s.ambassador) {
+          sendEventUpdatedEmail(s.ambassador, event, changedFields).catch((err) => console.error('[EVENT UPDATE EMAIL]', err));
+        }
+      });
     }
 
     if (data.baggedAndSent === true && before?.baggedAndSent !== true) {

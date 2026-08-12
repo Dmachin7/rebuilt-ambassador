@@ -86,6 +86,30 @@ async function sendShiftAssignedEmail(ambassador, event, isAssigned = true) {
   await send({ to: ambassador.email, subject: `Shift Confirmed: ${event.title} on ${fmt(event.date)}`, html });
 }
 
+// Sent once per event — never batched across events, even ones sharing a date/location, so an
+// ambassador assigned to two different events always gets two distinct emails, each clearly
+// naming the one specific event that changed.
+async function sendEventUpdatedEmail(ambassador, event, changedFields) {
+  const changeLabel = changedFields.join(', ');
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px;background:#f9f9f9;border-radius:8px">
+      <h2 style="color:#c2410c">📅 Event Updated: ${event.title}</h2>
+      <p style="color:#555">Hey ${ambassador.firstName}, the <strong>${changeLabel}</strong> changed for a shift you're assigned to. Here are the updated details:</p>
+      <div style="background:#fff;border-radius:6px;padding:20px;margin:16px 0;border:1px solid #e0e0e0">
+        <p style="margin:6px 0;color:#333"><strong>Event:</strong> ${event.title}</p>
+        <p style="margin:6px 0;color:#333"><strong>Date:</strong> ${fmt(event.date)}</p>
+        ${event.endTime ? `<p style="margin:6px 0;color:#333"><strong>Time:</strong> ${fmtTime(event.date)} – ${fmtTime(event.endTime)}</p>` : `<p style="margin:6px 0;color:#333"><strong>Start:</strong> ${fmtTime(event.date)}</p>`}
+        ${arrivalLine(event)}
+        <p style="margin:6px 0;color:#333"><strong>Location:</strong> ${event.location}</p>
+        ${event.contactName ? `<p style="margin:6px 0;color:#333"><strong>On-Site Contact:</strong> ${event.contactName}${event.contactPhone ? ` · ${event.contactPhone}` : ''}</p>` : ''}
+      </div>
+      <p style="color:#555">Log in to <a href="${process.env.FRONTEND_URL}" style="color:#2d6a4f">your dashboard</a> to view full details.</p>
+      <p style="color:#aaa;font-size:12px;margin-top:32px">ReBuilt Meals Ambassador Platform</p>
+    </div>
+  `;
+  await send({ to: ambassador.email, subject: `Event Updated: ${event.title} — ${fmt(event.date)}`, html });
+}
+
 async function sendEventReminderEmail(ambassador, event, hoursAway) {
   const label = hoursAway <= 2 ? '⏰ Starting in about 1 hour' : '📅 Tomorrow';
   const urgency = hoursAway <= 2 ? 'Your shift starts in about an hour' : "Your shift is tomorrow";
@@ -362,4 +386,5 @@ module.exports = {
   sendCheckInNotificationEmail,
   sendCheckoutNotificationEmail,
   sendSentToLocationEmail,
+  sendEventUpdatedEmail,
 };

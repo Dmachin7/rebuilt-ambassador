@@ -275,6 +275,58 @@ router.post('/:id/unassign', verifyToken, requireRole('ADMIN', 'EVENT_COORDINATO
   }
 });
 
+// Ambassadors may drop their own shift only if the event is at least this far out — close to the
+// date, dropping is disruptive enough that it should go through an admin/EC instead.
+const MIN_DROP_NOTICE_DAYS = 14;
+
+// POST /api/shifts/:id/drop — ambassador self-service drop, 2+ weeks before the event only
+router.post('/:id/drop', verifyToken, requireRole('AMBASSADOR'), async (req, res) => {
+  try {
+    const shift = await prisma.shift.findUnique({
+      where: { id: req.params.id },
+      include: {
+        event: true,
+        ambassador: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (shift.ambassadorId !== req.user.id) return res.status(403).json({ error: 'Not your shift' });
+    if (shift.status !== 'ASSIGNED') {
+      return res.status(400).json({ error: 'Only an assigned (not yet checked-in) shift can be dropped' });
+    }
+
+    const daysUntilEvent = (new Date(shift.event.date) - new Date()) / 86400000;
+    if (daysUntilEvent < MIN_DROP_NOTICE_DAYS) {
+      return res.status(400).json({
+        error: `Shifts can only be dropped at least ${MIN_DROP_NOTICE_DAYS} days before the event — contact an admin to drop this one.`,
+      });
+    }
+
+    const updated = await prisma.shift.update({
+      where: { id: req.params.id },
+      data: { ambassadorId: null, status: 'OPEN' },
+    });
+
+    prisma.user.findMany({
+      where: { role: { in: ['ADMIN', 'EVENT_COORDINATOR'] }, notifyShiftClaims: true },
+      select: { email: true },
+    })
+      .then((staff) => {
+        const emails = staff.map((u) => u.email);
+        if (emails.length > 0) {
+          sendShiftPickupEmail(emails, shift.ambassador, shift.event, 'dropped').catch((err) =>
+            console.error('[DROP EMAIL]', err));
+        }
+      })
+      .catch((err) => console.error('[DROP NOTIFY]', err));
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/shifts/:id/checkin
 router.post('/:id/checkin', verifyToken, upload.single('photo'), async (req, res) => {
   try {

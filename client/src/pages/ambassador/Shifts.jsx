@@ -11,6 +11,7 @@ export default function AmbassadorShifts() {
   const [tab, setTab] = useState('mine');
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(null);
+  const [dropping, setDropping] = useState(null);
 
   const load = async () => {
     const [mine, open] = await Promise.all([shiftsAPI.list(), shiftsAPI.listOpen()]);
@@ -34,10 +35,26 @@ export default function AmbassadorShifts() {
     }
   };
 
+  const handleDrop = async (shiftId) => {
+    if (!confirm('Drop this shift? It will go back to open for another ambassador to claim.')) return;
+    setDropping(shiftId);
+    try {
+      await shiftsAPI.drop(shiftId);
+      await load();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setDropping(null);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Spinner className="w-8 h-8" /></div>;
 
   const upcoming = myShifts.filter((s) => ['ASSIGNED', 'CHECKED_IN'].includes(s.status));
   const past = myShifts.filter((s) => s.status === 'COMPLETED');
+  const MIN_DROP_NOTICE_DAYS = 14;
+  const canDrop = (shift) =>
+    shift.status === 'ASSIGNED' && (new Date(shift.event.date) - new Date()) / 86400000 >= MIN_DROP_NOTICE_DAYS;
 
   return (
     <div className="px-4 py-5 space-y-4 max-w-lg mx-auto">
@@ -85,6 +102,17 @@ export default function AmbassadorShifts() {
                         <Link to={`/checkin/${shift.id}`} className="block mt-3">
                           <Button className="w-full" size="sm">Check In</Button>
                         </Link>
+                      )}
+                      {canDrop(shift) && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full mt-1.5 text-red-500 hover:text-red-600"
+                          onClick={() => handleDrop(shift.id)}
+                          disabled={dropping === shift.id}
+                        >
+                          {dropping === shift.id ? 'Dropping...' : 'Drop Shift'}
+                        </Button>
                       )}
                       {shift.status === 'CHECKED_IN' && (
                         <Link to={`/checkin/${shift.id}`} className="block mt-3">

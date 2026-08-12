@@ -262,8 +262,8 @@ router.put('/bulk-status', verifyToken, requireRole('ADMIN'), async (req, res) =
 // Event/Shift/Report data used by other ambassadors on the same event.
 router.put('/:id/breakdown', verifyToken, requireRole('ADMIN'), async (req, res) => {
   try {
-    const { onSiteHours, driveTimeHours, miles, sales, commissionEarned } = req.body;
-    const numericFields = { onSiteHours, driveTimeHours, miles, sales, commissionEarned };
+    const { onSiteHours, driveTimeHours, miles, sales, commissionEarned, hoursWorked: hoursWorkedInput } = req.body;
+    const numericFields = { onSiteHours, driveTimeHours, miles, sales, commissionEarned, hoursWorked: hoursWorkedInput };
     for (const [key, value] of Object.entries(numericFields)) {
       if (value === undefined || value === null) continue;
       if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
@@ -271,17 +271,24 @@ router.put('/:id/breakdown', verifyToken, requireRole('ADMIN'), async (req, res)
       }
     }
 
-    // Team meetings pay strictly for clocked time — skip the minimum-hours floor for them,
-    // same as the automatic checkout/admin-times calculation in shifts.js.
     const existing = await prisma.payment.findUnique({
       where: { id: req.params.id },
       select: { shift: { select: { event: { select: { isTeamMeeting: true } } } } },
     });
     if (!existing) return res.status(404).json({ error: 'Payment not found' });
-    const applyMinimum = !existing.shift?.event?.isTeamMeeting;
 
-    const rawHours = (onSiteHours || 0) + (driveTimeHours || 0);
-    const hoursWorked = Math.round((applyMinimum ? Math.max(MIN_PAID_HOURS, rawHours) : rawHours) * 100) / 100;
+    let hoursWorked;
+    if (hoursWorkedInput != null) {
+      // Directly typed into "Total Hours" — an explicit override, so it's used verbatim with
+      // no minimum-hours floor applied (that floor only makes sense for the auto-derived path).
+      hoursWorked = Math.round(hoursWorkedInput * 100) / 100;
+    } else {
+      // Team meetings pay strictly for clocked time — skip the minimum-hours floor for them,
+      // same as the automatic checkout/admin-times calculation in shifts.js.
+      const applyMinimum = !existing.shift?.event?.isTeamMeeting;
+      const rawHours = (onSiteHours || 0) + (driveTimeHours || 0);
+      hoursWorked = Math.round((applyMinimum ? Math.max(MIN_PAID_HOURS, rawHours) : rawHours) * 100) / 100;
+    }
     const amount = Math.round(hoursWorked * HOURLY_RATE * 100) / 100;
 
     const payment = await prisma.payment.update({

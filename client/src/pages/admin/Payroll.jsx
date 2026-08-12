@@ -175,6 +175,9 @@ function BiweeklySummary() {
 function PaymentBreakdownModal({ payment, onClose, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
+  // True only once the admin actually types into Total Hours — otherwise it's left to be
+  // auto-derived from on-site + drive time (with the minimum-hours floor) like it always was.
+  const [totalHoursTouched, setTotalHoursTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -184,11 +187,13 @@ function PaymentBreakdownModal({ payment, onClose, onSaved }) {
       setForm({
         onSiteHours: b.onSiteHours ?? 0,
         driveTimeHours: b.driveTimeHours ?? 0,
+        hoursWorked: payment.hoursWorked ?? 0,
         miles: b.miles ?? 0,
         sales: b.sales ?? 0,
         commissionEarned: b.commissionEarned ?? 0,
       });
       setEditing(false);
+      setTotalHoursTouched(false);
       setError('');
     }
   }, [payment]);
@@ -198,21 +203,30 @@ function PaymentBreakdownModal({ payment, onClose, onSaved }) {
   const b = p.breakdown || {};
   const totalPayout = Math.round(((p.amount || 0) + (b.mileageReimbursement || 0) + (b.commissionEarned || 0)) * 100) / 100;
 
-  const setField = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const setField = (field) => (e) => {
+    if (field === 'hoursWorked') setTotalHoursTouched(true);
+    setForm((f) => ({ ...f, [field]: e.target.value }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setError('');
     try {
-      const updated = await paymentsAPI.updateBreakdown(p.id, {
+      const payload = {
         onSiteHours: Number(form.onSiteHours) || 0,
         driveTimeHours: Number(form.driveTimeHours) || 0,
         miles: Number(form.miles) || 0,
         sales: Math.round(Number(form.sales)) || 0,
         commissionEarned: Number(form.commissionEarned) || 0,
-      });
+      };
+      // Only sent when the admin explicitly edited Total Hours — an override that wins outright
+      // over the on-site + drive time calculation (and skips the 4-hour minimum entirely).
+      if (totalHoursTouched) payload.hoursWorked = Number(form.hoursWorked) || 0;
+
+      const updated = await paymentsAPI.updateBreakdown(p.id, payload);
       onSaved(updated);
       setEditing(false);
+      setTotalHoursTouched(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -270,7 +284,12 @@ function PaymentBreakdownModal({ payment, onClose, onSaved }) {
             editField="onSiteHours" editSuffix="hrs"
           />
           <Line label="Drive Time (round-trip)" value={formatHours(b.driveTimeHours)} editField="driveTimeHours" editSuffix="hrs" />
-          <Line label="Total Hours" value={formatHours(p.hoursWorked)} bold />
+          <Line
+            label="Total Hours"
+            value={formatHours(p.hoursWorked)}
+            editField="hoursWorked" editStep="0.1" editSuffix="hrs"
+            bold
+          />
           <Line label="Hourly Pay" value={formatCurrency(p.amount)} />
         </div>
 
@@ -302,6 +321,7 @@ function PaymentBreakdownModal({ payment, onClose, onSaved }) {
         {editing && (
           <p className="text-xs text-slate-400 pt-1">
             Hourly pay and mileage reimbursement recalculate automatically from the hours/miles above after you save.
+            Editing Total Hours directly overrides the on-site + drive time calculation entirely (including the 4-hour minimum) — leave it alone to keep it auto-calculated.
           </p>
         )}
 

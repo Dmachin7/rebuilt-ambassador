@@ -1,46 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { eventsAPI, usersAPI, availabilityAPI, shiftsAPI } from '../api/index.js';
+import { eventsAPI, usersAPI, availabilityAPI, shiftsAPI, pickupLocationsAPI } from '../api/index.js';
 import { Button, Modal, Input, Textarea, Select } from './ui/index.jsx';
 import { MapPin } from 'lucide-react';
 import { autocompleteLocation } from '../stubs/maps.js';
-
-const PICKUP_LOCATIONS = [
-  'Burn Boot Camp Brandon',
-  'Cigar City CrossFit',
-  'F45 Training Lakeland Highlands',
-  'F45 Training Riverview',
-  'ReBuilt Downstairs Fridge',
-  'Neighborly Care Network',
-  'Bayshore Fit',
-  'Burn Boot Camp South Tampa',
-  'CAMP Tampa',
-  'Perform24 Tampa',
-  'Burg CrossFit Downtown',
-  'CrossFit St. Pete',
-  'Elevate St. Pete',
-  'Sunshine City CrossFit',
-  'CrossFit Aero',
-  'F45 Training Wiregrass',
-  'Fit Body Boot Camp - Lutz',
-  'Fit24 Tampa',
-  'Anytime Fitness Clearwater',
-  'F45 Training Largo East',
-  'F45 Training Midtown Tampa',
-  'TrYumph Fitness Largo',
-  'CAMP Tampa 2nd Delivery',
-  'CAMP Tampa 3rd Delivery',
-  'Nutrishop South Tampa',
-  'Lexus',
-  'Anytime Fitness Tarpon Springs',
-  'Level Up Westchase',
-  'Seven Springs CrossFit',
-  'Train Harder CrossFit',
-  'Burn Boot Camp Apollo Beach',
-  'CrossFit Manatee',
-  'F45 Training Sarasota UTC',
-  'MAD Nutrition & Smoothies',
-  'CrossFit Brooksville',
-];
 
 const CUSTOM_LOCATION = '__custom__';
 
@@ -163,6 +125,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
   const [expandedShiftId, setExpandedShiftId] = useState(null);
   const [shiftAssignSaving, setShiftAssignSaving] = useState(false);
   const [pickupCustomMode, setPickupCustomMode] = useState(false);
+  const [pickupLocations, setPickupLocations] = useState([]); // admin-managed, see Settings page
 
   // Reset the form whenever the modal opens, or the event/date it's editing/prefilling changes.
   useEffect(() => {
@@ -171,6 +134,7 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
     setAvailabilityByAmbassador({});
     usersAPI.list('AMBASSADOR').then(setAmbassadors).catch(() => {});
     usersAPI.list().then((all) => setStaff(all.filter((u) => u.role === 'ADMIN' || u.role === 'EVENT_COORDINATOR'))).catch(() => {});
+    pickupLocationsAPI.list().then((list) => setPickupLocations(list.map((l) => l.name))).catch(() => {});
 
     if (editingEvent) {
       setForm({
@@ -198,7 +162,6 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
       });
       setDistance({ milesFromHq: editingEvent.milesFromHq ?? '', driveTimeMins: editingEvent.driveTimeMins ?? '' });
       setShifts(editingEvent.shifts || []);
-      setPickupCustomMode(!!editingEvent.pickupLocation && !PICKUP_LOCATIONS.includes(editingEvent.pickupLocation));
     } else {
       setForm({ ...EMPTY_FORM, eventDate: initialDate || '' });
       setDistance({ milesFromHq: '', driveTimeMins: '' });
@@ -209,6 +172,13 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
     setExpandedShiftId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editingEvent, initialDate]);
+
+  // Separate from the reset effect above since pickupLocations loads asynchronously — this
+  // re-evaluates once the list actually arrives instead of racing against a still-empty array.
+  useEffect(() => {
+    if (!isOpen || !editingEvent || pickupLocations.length === 0) return;
+    setPickupCustomMode(!!editingEvent.pickupLocation && !pickupLocations.includes(editingEvent.pickupLocation));
+  }, [isOpen, editingEvent, pickupLocations]);
 
   // Look up each ambassador's set availability for the event's date, so the assignment list can be
   // filtered/annotated instead of relying on the ambassador's static (usually-stale) isAvailable flag.
@@ -329,18 +299,23 @@ export default function EventFormModal({ isOpen, onClose, editingEvent, initialD
           }}
         >
           <option value="">— Select —</option>
-          {PICKUP_LOCATIONS.map((loc) => (
+          {pickupLocations.map((loc) => (
             <option key={loc} value={loc}>{loc}</option>
           ))}
           <option value={CUSTOM_LOCATION}>Custom...</option>
         </Select>
         {pickupCustomMode && (
-          <Input
-            value={form.pickupLocation}
-            onChange={f('pickupLocation')}
-            placeholder="Enter a custom pickup location"
-            autoFocus
-          />
+          <div>
+            <Input
+              value={form.pickupLocation}
+              onChange={f('pickupLocation')}
+              placeholder="Enter a custom pickup location"
+              autoFocus
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              One-off for this event only — add it permanently to the dropdown in Settings → Pickup Locations.
+            </p>
+          </div>
         )}
 
         <div className="rounded-lg p-3 space-y-3 border bg-slate-50 border-slate-200">

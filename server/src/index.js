@@ -15,6 +15,7 @@ const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const availabilityRoutes = require('./routes/availability');
 const analyticsRoutes = require('./routes/analytics');
+const pickupLocationRoutes = require('./routes/pickupLocations');
 
 require('./services/reminderCron');
 
@@ -40,6 +41,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/pickup-locations', pickupLocationRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

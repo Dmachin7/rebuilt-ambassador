@@ -127,3 +127,11 @@ export const analyticsAPI = {
   },
   ambassadorStats: () => api.get('/analytics/ambassador-stats'),
 };
+
+// Pickup Locations
+export const pickupLocationsAPI = {
+  list: () => api.get('/pickup-locations'),
+  create: (name) => api.post('/pickup-locations', { name }),
+  update: (id, name) => api.put(`/pickup-locations/${id}`, { name }),
+  delete: (id) => api.delete(`/pickup-locations/${id}`),
+};

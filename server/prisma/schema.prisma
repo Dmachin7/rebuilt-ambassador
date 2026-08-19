@@ -248,3 +248,13 @@ model LeaderboardEntry {
 
   @@unique([userId, month, year])
 }
+
+// Admin/EC-managed picker options for Event.pickupLocation. That field stores a plain string,
+// not a foreign key to this table, so renaming here propagates to existing events explicitly
+// (see PUT /api/pickup-locations/:id) while deleting only removes it from future picks.
+model PickupLocation {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -16,8 +16,10 @@ const notificationRoutes = require('./routes/notifications');
 const availabilityRoutes = require('./routes/availability');
 const analyticsRoutes = require('./routes/analytics');
 const pickupLocationRoutes = require('./routes/pickupLocations');
+const { seedPickupLocationsIfEmpty } = require('./services/seedPickupLocations');
 
 require('./services/reminderCron');
+seedPickupLocationsIfEmpty();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

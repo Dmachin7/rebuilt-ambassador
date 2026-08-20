@@ -160,9 +160,7 @@ export default function BagTagsPrint() {
                     value={tag.title}
                     onCommit={(v) => updateTag(idx, 'title', v)}
                   />
-                  {tag.bagCount > 1 && (
-                    <span className="tag-bagcount-inline"> {tag.bagIndex} of {tag.bagCount}</span>
-                  )}
+                  <span className="tag-bagcount-inline"> {tag.bagIndex} of {tag.bagCount}</span>
                 </div>
                 <EditableText
                   className="tag-line"

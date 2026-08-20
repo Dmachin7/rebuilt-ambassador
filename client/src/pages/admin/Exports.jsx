@@ -101,7 +101,7 @@ function ProjectionsTab({ range }) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-700 truncate">{e.title}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{longDate(e.date)}</div>
+                  <div className="text-sm font-semibold text-black mt-0.5">{longDate(e.date)} · {eventTime(e.date)}</div>
                   {e.pickupLocation ? (
                     <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                       <MapPin size={11} className="text-slate-400" /> {e.pickupLocation}

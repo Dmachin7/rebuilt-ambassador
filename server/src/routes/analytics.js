@@ -106,7 +106,9 @@ router.get('/cac', verifyToken, requireRole('ADMIN'), async (req, res) => {
 
 // GET /api/analytics/ambassador-stats — all-time (no date range) avg on-site hours per sale,
 // conversion % (shifts with at least one sale ÷ shifts worked), and lifetime sales total per
-// ambassador, keyed by ambassadorId — for the roster cards on the Ambassadors page.
+// ambassador, keyed by ambassadorId — for the roster cards on the Ambassadors page. Folds in
+// imported HistoricalPromo rows (pre-app promo history) matched to this ambassador, so lifetime
+// figures reflect the full history, not just what's been worked since the app launched.
 router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, res) => {
   try {
     const ambassadors = await prisma.user.findMany({
@@ -122,6 +124,9 @@ router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, r
             payment: { select: { salesOverride: true } },
           },
         },
+        historicalPromos: {
+          select: { hoursWorked: true, salesCount: true },
+        },
       },
     });
 
@@ -133,22 +138,118 @@ router.get('/ambassador-stats', verifyToken, requireRole('ADMIN'), async (req, r
     const stats = {};
     ambassadors.forEach((amb) => {
       const shifts = amb.shifts;
-      const onSiteHours = shifts.reduce((s, sh) => {
+      const liveOnSiteHours = shifts.reduce((s, sh) => {
         if (!sh.checkinTime || !sh.checkoutTime) return s;
         return s + (new Date(sh.checkoutTime) - new Date(sh.checkinTime)) / 3600000;
       }, 0);
-      const salesTotal = shifts.reduce((s, sh) => s + shiftSales(sh), 0);
-      const shiftsWithSale = shifts.filter((sh) => shiftSales(sh) > 0).length;
+      const liveSales = shifts.reduce((s, sh) => s + shiftSales(sh), 0);
+      const liveShiftsWithSale = shifts.filter((sh) => shiftSales(sh) > 0).length;
+
+      const historical = amb.historicalPromos;
+      const historicalHours = historical.reduce((s, h) => s + h.hoursWorked, 0);
+      const historicalSales = historical.reduce((s, h) => s + h.salesCount, 0);
+      const historicalWithSale = historical.filter((h) => h.salesCount > 0).length;
+
+      const onSiteHours = liveOnSiteHours + historicalHours;
+      const salesTotal = liveSales + historicalSales;
+      const workedCount = shifts.length + historical.length;
+      const withSaleCount = liveShiftsWithSale + historicalWithSale;
 
       stats[amb.id] = {
         shiftCount: shifts.length,
         salesTotal,
         avgHoursPerSale: salesTotal > 0 ? round2(onSiteHours / salesTotal) : null,
-        conversionPct: shifts.length > 0 ? round2((shiftsWithSale / shifts.length) * 100) : null,
+        conversionPct: workedCount > 0 ? round2((withSaleCount / workedCount) * 100) : null,
       };
     });
 
     res.json(stats);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/analytics/promo-log — flat per-promo log for a date range: one row per shift
+// worked (live app data) plus imported HistoricalPromo rows, merged and sorted by date. This
+// mirrors the manual spreadsheet the team tracked this in before the app existed — see
+// HistoricalPromo in schema.prisma for why history is a separate table rather than fake
+// Event/Shift rows. Deliberately excludes cost/mileage — this is a work log, not the CAC report.
+router.get('/promo-log', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const end = req.query.end ? new Date(req.query.end) : new Date();
+    const start = req.query.start ? new Date(req.query.start) : new Date(end.getTime() - 30 * 24 * 3600000);
+    const endInclusive = new Date(end.getTime() + 24 * 3600000);
+
+    const round2 = (n) => Math.round(n * 100) / 100;
+
+    const shifts = await prisma.shift.findMany({
+      where: {
+        status: 'COMPLETED',
+        ambassadorId: { not: null },
+        event: { date: { gte: start, lt: endInclusive } },
+      },
+      include: {
+        event: { select: { title: true, location: true, date: true } },
+        ambassador: { select: { id: true, firstName: true, lastName: true } },
+        report: { select: { totalSales: true, mealsSold: true } },
+        payment: { select: { salesOverride: true } },
+      },
+    });
+
+    const liveRows = shifts.map((s) => {
+      const onSiteHours = s.checkinTime && s.checkoutTime
+        ? round2((new Date(s.checkoutTime) - new Date(s.checkinTime)) / 3600000)
+        : null;
+      const salesCount = s.payment?.salesOverride ?? s.report?.totalSales ?? 0;
+      const mealsSold = s.report?.mealsSold ?? 0;
+      return {
+        source: 'live',
+        shiftId: s.id,
+        promoName: s.event.location || s.event.title,
+        date: s.event.date,
+        ambassadorId: s.ambassador.id,
+        ambassadorName: `${s.ambassador.firstName} ${s.ambassador.lastName}`,
+        hoursWorked: onSiteHours,
+        salesCount,
+        mealsSold,
+        avgMealsPerSale: salesCount > 0 ? round2(mealsSold / salesCount) : null,
+      };
+    });
+
+    const historical = await prisma.historicalPromo.findMany({
+      where: { date: { gte: start, lt: endInclusive } },
+      include: { ambassador: { select: { id: true, firstName: true, lastName: true } } },
+    });
+
+    const historicalRows = historical.map((h) => ({
+      source: 'imported',
+      shiftId: h.id,
+      promoName: h.promoName,
+      date: h.date,
+      ambassadorId: h.ambassadorId,
+      // Imported rows with no matching account are almost always people no longer on the team —
+      // shown generically rather than by name (the raw CSV name is still kept in the DB for
+      // audit purposes, just not surfaced here).
+      ambassadorName: h.ambassador ? `${h.ambassador.firstName} ${h.ambassador.lastName}` : 'Ex-Employee',
+      hoursWorked: h.hoursWorked,
+      salesCount: h.salesCount,
+      mealsSold: h.mealsSold,
+      avgMealsPerSale: h.salesCount > 0 ? round2(h.mealsSold / h.salesCount) : null,
+    }));
+
+    const rows = [...liveRows, ...historicalRows].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        hoursWorked: round2(acc.hoursWorked + (r.hoursWorked || 0)),
+        salesCount: acc.salesCount + r.salesCount,
+        mealsSold: acc.mealsSold + r.mealsSold,
+      }),
+      { hoursWorked: 0, salesCount: 0, mealsSold: 0 }
+    );
+
+    res.json({ start: start.toISOString(), end: end.toISOString(), rows, totals });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

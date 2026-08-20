@@ -126,6 +126,12 @@ export const analyticsAPI = {
     return api.get(`/analytics/cac${params.length ? `?${params.join('&')}` : ''}`);
   },
   ambassadorStats: () => api.get('/analytics/ambassador-stats'),
+  promoLog: (start, end) => {
+    const params = [];
+    if (start) params.push(`start=${start}`);
+    if (end) params.push(`end=${end}`);
+    return api.get(`/analytics/promo-log${params.length ? `?${params.join('&')}` : ''}`);
+  },
 };
 
 // Pickup Locations

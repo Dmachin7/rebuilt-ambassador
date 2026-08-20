@@ -78,12 +78,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  shifts           Shift[]
-  sentMessages     Message[]
-  payments         Payment[]
-  leaderboardEntry LeaderboardEntry[]
-  availabilityDays AvailabilityDay[]
-  baggedEvents     Event[]            @relation("EventBaggedBy")
+  shifts            Shift[]
+  sentMessages      Message[]
+  payments          Payment[]
+  leaderboardEntry  LeaderboardEntry[]
+  availabilityDays  AvailabilityDay[]
+  baggedEvents      Event[]            @relation("EventBaggedBy")
+  historicalPromos  HistoricalPromo[]
 }
 
 model Event {
@@ -257,4 +258,29 @@ model PickupLocation {
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Pre-app promo history, bulk-imported from the spreadsheet the team tracked this in before
+// this app existed. Deliberately NOT modeled as Event/Shift/Payment rows — those old promos
+// have no real check-in/out, no payroll status, and importing them as live shifts would dump a
+// backlog into Calendar/Payroll for pay periods that were already handled outside the app. This
+// exists purely so that history is visible in the Promo Log report and folds into ambassador
+// lifetime stats (hours/sale, sales total) without touching operational data.
+model HistoricalPromo {
+  id             String   @id @default(cuid())
+  ambassadorId   String?
+  ambassador     User?    @relation(fields: [ambassadorId], references: [id])
+  // Raw name as it appeared in the import — kept even when matched to a real User, so an
+  // unmatched or misspelled name is still visible/auditable rather than silently dropped.
+  ambassadorName String
+  promoName      String
+  date           DateTime
+  hoursWorked    Float
+  salesCount     Int      @default(0)
+  mealsSold      Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([ambassadorId])
+  @@index([date])
 }
